@@ -59,6 +59,14 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
       }}>
       <Tabs.Screen
+        name="inicio"
+        options={{
+          title: 'Inicio',
+          headerTitle: 'Inicio',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="venta"
         options={{
           title: 'Venta',
@@ -73,14 +81,6 @@ export default function TabLayout() {
           title: 'Productos',
           headerTitle: 'Productos',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cube.box.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="unidades"
-        options={{
-          title: 'Unidades',
-          headerTitle: 'Unidades',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="ruler.fill" color={color} />,
         }}
       />
     </Tabs>

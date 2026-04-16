@@ -19,6 +19,17 @@ export function fetchStockProductoAlmacen(productoId: string, almacenId: string)
   return apiFetch<StockInfo>(`/stock/producto/${productoId}/almacen/${almacenId}`);
 }
 
+export type StockAlmacenResponse = { stocks: StockInfo[]; total: number };
+
+export function fetchStockAlmacen(almacenId: string, busqueda = '', pagina = 1, limite = 200) {
+  const q = new URLSearchParams({
+    pagina: String(pagina),
+    limite: String(limite),
+    ...(busqueda.trim() ? { busqueda: busqueda.trim() } : {}),
+  });
+  return apiFetch<StockAlmacenResponse>(`/stock/almacen/${almacenId}?${q.toString()}`);
+}
+
 export function crearVenta(body: CrearVentaPayload) {
   return apiFetch<VentaResponse>('/ventas', { method: 'POST', body });
 }
