@@ -3,9 +3,9 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@/core/*": ["./core/*"],
+      "@/admin/*": ["./admin/*"]
     }
   },
   "include": [
