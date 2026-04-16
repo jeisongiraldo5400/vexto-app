@@ -11,10 +11,15 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "La cámara se usa para leer códigos de barras de los productos al vender."
+        "NSCameraUsageDescription": "La cámara se usa para leer códigos de barras de los productos al vender.",
+        "NSLocalNetworkUsageDescription": "Vexto accede al servidor en tu red local (Wi‑Fi) para sincronizar inventario y ventas.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

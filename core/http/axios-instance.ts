@@ -1,4 +1,9 @@
-import axios, { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosHeaders,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+} from 'axios';
 
 import { getApiBaseUrl } from '@/core/config';
 import * as secureSession from '@/core/session/secure-session';
@@ -12,8 +17,14 @@ export function normalizeApiPath(path: string): string {
   return path.startsWith('/') ? path.slice(1) : path;
 }
 
+function attachResolvedApiBaseURL(client: AxiosInstance) {
+  client.interceptors.request.use((config) => {
+    config.baseURL = getApiBaseUrl();
+    return config;
+  });
+}
+
 export const publicAxios = axios.create({
-  baseURL: getApiBaseUrl(),
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -21,12 +32,14 @@ export const publicAxios = axios.create({
 });
 
 export const authedAxios = axios.create({
-  baseURL: getApiBaseUrl(),
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   },
 });
+
+attachResolvedApiBaseURL(publicAxios);
+attachResolvedApiBaseURL(authedAxios);
 
 authedAxios.interceptors.request.use(async (config) => {
   const session = await secureSession.loadSession();
