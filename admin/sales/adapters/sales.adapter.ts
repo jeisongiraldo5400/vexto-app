@@ -1,5 +1,5 @@
 import { apiFetch } from '@/core/http/api';
-import type { Almacen, MetodoPago, VentaResponse } from '@/core/types';
+import type { Almacen, MetodoPago, StockInfo, VentaResponse } from '@/core/types';
 
 export type CrearVentaPayload = {
   almacenId: string;
@@ -13,6 +13,10 @@ export function fetchAlmacenes() {
 
 export function fetchMetodosPago() {
   return apiFetch<MetodoPago[]>('/metodos-pago');
+}
+
+export function fetchStockProductoAlmacen(productoId: string, almacenId: string) {
+  return apiFetch<StockInfo>(`/stock/producto/${productoId}/almacen/${almacenId}`);
 }
 
 export function crearVenta(body: CrearVentaPayload) {

@@ -53,6 +53,15 @@ export type MetodoPago = {
   estado: string;
 };
 
+export type StockInfo = {
+  id: string;
+  productoId: string;
+  almacenId: string;
+  cantidad: number;
+  cantidadReservada: number;
+  cantidadDisponible: number;
+};
+
 export type VentaResponse = {
   id: string;
   numeroFactura: string;

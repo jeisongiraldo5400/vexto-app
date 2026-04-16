@@ -1,4 +1,5 @@
 import { Colors } from '@/constants/theme';
+import { formatCurrency } from '@/core/format';
 import type { Producto } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
@@ -24,7 +25,7 @@ export function ProductCatalogList({ data, emptyLabel = 'No hay resultados.' }: 
             Código {item.codigo}
             {item.codigoBarras ? ` · Barras ${item.codigoBarras}` : ''}
           </Text>
-          <Text style={[styles.price, { color: c.tint }]}>${item.precioVenta.toFixed(0)}</Text>
+          <Text style={[styles.price, { color: c.tint }]}>{formatCurrency(item.precioVenta)}</Text>
           {item.unidadMedida ? (
             <Text style={[styles.sub, { color: c.textSecondary }]}>Unidad: {item.unidadMedida.abreviatura}</Text>
           ) : null}

@@ -1,4 +1,5 @@
 import { Brand, Colors } from '@/constants/theme';
+import { formatCurrency, formatNumber } from '@/core/format';
 import type { Producto } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
@@ -14,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const MAX_QTY = 9999;
+const ABSOLUTE_MAX_QTY = 9999;
 const MAX_DIGITS = 4;
 const GAP = 10;
 const KEY_MIN = 68;
@@ -22,6 +23,7 @@ const KEY_MIN = 68;
 type Props = {
   visible: boolean;
   product: Producto | null;
+  stockDisponible: number | null;
   onConfirm: (cantidad: number) => void;
   onCancel: () => void;
 };
@@ -30,14 +32,19 @@ function parseQtyFromDigits(digits: string): number {
   if (!digits || digits === '0') return 1;
   const n = parseInt(digits, 10);
   if (Number.isNaN(n) || n < 1) return 1;
-  return Math.min(MAX_QTY, n);
+  return Math.min(ABSOLUTE_MAX_QTY, n);
 }
 
-export function QuantityNumpadModal({ visible, product, onConfirm, onCancel }: Props) {
+export function QuantityNumpadModal({ visible, product, stockDisponible, onConfirm, onCancel }: Props) {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
   const [digits, setDigits] = useState('1');
+
+  const maxQty =
+    stockDisponible !== null
+      ? Math.min(stockDisponible, ABSOLUTE_MAX_QTY)
+      : ABSOLUTE_MAX_QTY;
 
   useEffect(() => {
     if (visible && product) {
@@ -50,23 +57,26 @@ export function QuantityNumpadModal({ visible, product, onConfirm, onCancel }: P
     }
   }, [visible, product?.id]);
 
-  const pushDigit = useCallback((d: string) => {
-    setDigits((prev) => {
-      if (prev.length >= MAX_DIGITS) return prev;
-      let next: string;
-      if (prev === '1') {
-        if (d === '0') next = '10';
-        else if (d === '1') next = '11';
-        else next = d;
-      } else {
-        next = prev + d;
-      }
-      const n = parseInt(next, 10);
-      if (!Number.isNaN(n) && n > MAX_QTY) return prev;
-      return next;
-    });
-    void Haptics.selectionAsync();
-  }, []);
+  const pushDigit = useCallback(
+    (d: string) => {
+      setDigits((prev) => {
+        if (prev.length >= MAX_DIGITS) return prev;
+        let next: string;
+        if (prev === '1') {
+          if (d === '0') next = '10';
+          else if (d === '1') next = '11';
+          else next = d;
+        } else {
+          next = prev + d;
+        }
+        const n = parseInt(next, 10);
+        if (!Number.isNaN(n) && n > maxQty) return prev;
+        return next;
+      });
+      void Haptics.selectionAsync();
+    },
+    [maxQty],
+  );
 
   const backspace = useCallback(() => {
     setDigits((prev) => {
@@ -90,6 +100,9 @@ export function QuantityNumpadModal({ visible, product, onConfirm, onCancel }: P
   if (!product) return null;
 
   const previewQty = parseQtyFromDigits(digits);
+  const exceedsStock = stockDisponible !== null && previewQty > stockDisponible;
+  const noStock = stockDisponible !== null && stockDisponible <= 0;
+  const confirmDisabled = exceedsStock || noStock;
 
   const keyStyle = (pressed: boolean) => [
     styles.key,
@@ -128,22 +141,63 @@ export function QuantityNumpadModal({ visible, product, onConfirm, onCancel }: P
             {product.nombre}
           </Text>
           <Text style={[styles.priceLine, { color: c.textSecondary }]}>
-            Precio: ${product.precioVenta.toFixed(0)} · Código {product.codigo}
+            Precio: {formatCurrency(product.precioVenta)} · Código {product.codigo}
           </Text>
+
+          {stockDisponible !== null ? (
+            <View
+              style={[
+                styles.stockBadge,
+                {
+                  backgroundColor: noStock ? '#fee2e2' : c.tintMuted,
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.stockBadgeText,
+                  { color: noStock ? c.error : c.tint },
+                ]}>
+                {noStock
+                  ? '⚠ Sin stock disponible'
+                  : `Disponible: ${formatNumber(stockDisponible)} unid.`}
+              </Text>
+            </View>
+          ) : null}
 
           <Text style={[styles.question, { color: c.text }]}>¿Cuántas unidades lleva?</Text>
-          <Text style={[styles.hint, { color: c.textSecondary }]}>
-            Toque los números grandes. Cuando termine, pulse el botón verde abajo.
-          </Text>
+          {stockDisponible !== null && !noStock ? (
+            <Text style={[styles.hint, { color: c.textSecondary }]}>
+              Máximo permitido: {formatNumber(maxQty)} unid. Toque los números grandes y pulse el
+              botón verde.
+            </Text>
+          ) : (
+            <Text style={[styles.hint, { color: c.textSecondary }]}>
+              Toque los números grandes. Cuando termine, pulse el botón verde abajo.
+            </Text>
+          )}
 
-          <View style={[styles.displayWrap, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View
+            style={[
+              styles.displayWrap,
+              {
+                backgroundColor: c.background,
+                borderColor: exceedsStock ? c.error : c.border,
+              },
+            ]}>
             <Text style={[styles.displayLabel, { color: c.textSecondary }]}>Cantidad</Text>
-            <Text style={[styles.displayValue, { color: c.text }]} accessibilityRole="header">
+            <Text
+              style={[styles.displayValue, { color: exceedsStock ? c.error : c.text }]}
+              accessibilityRole="header">
               {digits}
             </Text>
             <Text style={[styles.preview, { color: c.textMuted }]}>
-              Subtotal aprox.: ${(product.precioVenta * previewQty).toFixed(0)}
+              Subtotal aprox.: {formatCurrency(product.precioVenta * previewQty)}
             </Text>
+            {exceedsStock ? (
+              <Text style={[styles.stockError, { color: c.error }]}>
+                Supera el stock disponible ({formatNumber(stockDisponible!)})
+              </Text>
+            ) : null}
           </View>
 
           {row(['1', '2', '3'])}
@@ -175,11 +229,23 @@ export function QuantityNumpadModal({ visible, product, onConfirm, onCancel }: P
           <Pressable
             style={({ pressed }) => [
               styles.confirmBtn,
-              { backgroundColor: Brand.primary, opacity: pressed ? 0.9 : 1 },
+              {
+                backgroundColor: confirmDisabled ? c.borderSubtle : Brand.primary,
+                opacity: pressed ? 0.9 : 1,
+              },
             ]}
             onPress={handleConfirm}
-            accessibilityLabel="Agregar al carrito">
-            <Text style={styles.confirmBtnText}>Agregar al carrito</Text>
+            disabled={confirmDisabled}
+            accessibilityLabel={
+              noStock
+                ? 'Sin stock disponible'
+                : exceedsStock
+                  ? 'Cantidad supera el stock'
+                  : 'Agregar al carrito'
+            }>
+            <Text style={[styles.confirmBtnText, { color: confirmDisabled ? c.textMuted : '#ffffff' }]}>
+              {noStock ? 'Sin stock disponible' : 'Agregar al carrito'}
+            </Text>
           </Pressable>
 
           <Pressable style={styles.cancelBtn} onPress={onCancel} accessibilityLabel="Cerrar sin agregar">
@@ -206,7 +272,15 @@ const styles = StyleSheet.create({
   },
   kicker: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
   productName: { fontSize: 22, fontWeight: '800', lineHeight: 28 },
-  priceLine: { fontSize: 16, marginTop: 8, marginBottom: 16 },
+  priceLine: { fontSize: 16, marginTop: 8, marginBottom: 10 },
+  stockBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  stockBadgeText: { fontSize: 14, fontWeight: '700' },
   question: { fontSize: 20, fontWeight: '800', marginBottom: 6 },
   hint: { fontSize: 15, lineHeight: 22, marginBottom: 14 },
   displayWrap: {
@@ -220,6 +294,7 @@ const styles = StyleSheet.create({
   displayLabel: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
   displayValue: { fontSize: 48, fontWeight: '900', letterSpacing: 2 },
   preview: { fontSize: 15, marginTop: 6 },
+  stockError: { fontSize: 13, fontWeight: '700', marginTop: 4 },
   keyRow: {
     flexDirection: 'row',
     gap: GAP,
@@ -243,7 +318,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 10,
   },
-  confirmBtnText: { color: '#ffffff', fontSize: 20, fontWeight: '800' },
+  confirmBtnText: { fontSize: 20, fontWeight: '800' },
   cancelBtn: { paddingVertical: 14, alignItems: 'center' },
   cancelBtnText: { fontSize: 17, fontWeight: '600' },
 });

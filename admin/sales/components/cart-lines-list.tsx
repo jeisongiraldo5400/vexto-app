@@ -1,9 +1,14 @@
 import { Colors } from '@/constants/theme';
+import { formatCurrency } from '@/core/format';
 import type { Producto } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export type CartLine = { producto: Producto; cantidad: number };
+export type CartLine = {
+  producto: Producto;
+  cantidad: number;
+  stockDisponible: number | null;
+};
 
 type Props = {
   cart: CartLine[];
@@ -41,33 +46,59 @@ export function CartLinesList({ cart, onChangeQty }: Props) {
         </View>
       ) : (
         <View style={styles.list}>
-          {cart.map((item) => (
-            <View
-              key={item.producto.id}
-              style={[styles.lineRow, { backgroundColor: c.backgroundPaper, borderColor: c.cardBorder }]}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.lineTitle, { color: c.text }]} numberOfLines={2}>
-                  {item.producto.nombre}
-                </Text>
-                <Text style={[styles.lineSub, { color: c.textSecondary }]}>
-                  ${item.producto.precioVenta.toFixed(0)} c/u · ${(item.producto.precioVenta * item.cantidad).toFixed(0)}
-                </Text>
+          {cart.map((item) => {
+            const atMax =
+              item.stockDisponible !== null && item.cantidad >= item.stockDisponible;
+            return (
+              <View
+                key={item.producto.id}
+                style={[styles.lineRow, { backgroundColor: c.backgroundPaper, borderColor: c.cardBorder }]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.lineTitle, { color: c.text }]} numberOfLines={2}>
+                    {item.producto.nombre}
+                  </Text>
+                  <Text style={[styles.lineSub, { color: c.textSecondary }]}>
+                    {formatCurrency(item.producto.precioVenta)} c/u ·{' '}
+                    {formatCurrency(item.producto.precioVenta * item.cantidad)}
+                  </Text>
+                  {item.stockDisponible !== null ? (
+                    <Text
+                      style={[
+                        styles.stockHint,
+                        { color: atMax ? c.error : c.textMuted },
+                      ]}>
+                      {atMax
+                        ? `Máx. disponible: ${item.stockDisponible}`
+                        : `Disponible: ${item.stockDisponible}`}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.qtyRow}>
+                  <Pressable
+                    style={[styles.qtyBtn, { backgroundColor: c.borderSubtle }]}
+                    onPress={() => onChangeQty(item.producto.id, item.cantidad - 1)}>
+                    <Text style={[styles.qtyBtnText, { color: c.text }]}>−</Text>
+                  </Pressable>
+                  <Text style={[styles.qtyVal, { color: c.text }]}>{item.cantidad}</Text>
+                  <Pressable
+                    style={[
+                      styles.qtyBtn,
+                      {
+                        backgroundColor: atMax ? c.borderSubtle : c.borderSubtle,
+                        opacity: atMax ? 0.35 : 1,
+                      },
+                    ]}
+                    onPress={() => {
+                      if (!atMax) onChangeQty(item.producto.id, item.cantidad + 1);
+                    }}
+                    disabled={atMax}
+                    accessibilityLabel={atMax ? 'Stock máximo alcanzado' : 'Aumentar cantidad'}>
+                    <Text style={[styles.qtyBtnText, { color: c.text }]}>+</Text>
+                  </Pressable>
+                </View>
               </View>
-              <View style={styles.qtyRow}>
-                <Pressable
-                  style={[styles.qtyBtn, { backgroundColor: c.borderSubtle }]}
-                  onPress={() => onChangeQty(item.producto.id, item.cantidad - 1)}>
-                  <Text style={[styles.qtyBtnText, { color: c.text }]}>−</Text>
-                </Pressable>
-                <Text style={[styles.qtyVal, { color: c.text }]}>{item.cantidad}</Text>
-                <Pressable
-                  style={[styles.qtyBtn, { backgroundColor: c.borderSubtle }]}
-                  onPress={() => onChangeQty(item.producto.id, item.cantidad + 1)}>
-                  <Text style={[styles.qtyBtnText, { color: c.text }]}>+</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>
@@ -123,6 +154,7 @@ const styles = StyleSheet.create({
   },
   lineTitle: { fontSize: 15, fontWeight: '600' },
   lineSub: { fontSize: 13, marginTop: 3 },
+  stockHint: { fontSize: 12, marginTop: 2, fontWeight: '600' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 },
   qtyBtn: {
     width: 40,

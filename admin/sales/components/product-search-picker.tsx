@@ -1,4 +1,5 @@
 import { Colors } from '@/constants/theme';
+import { formatCurrency } from '@/core/format';
 import type { Producto } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -44,7 +45,7 @@ export function ProductSearchPicker({ busqueda, onBusquedaChange, resultados, lo
             onPress={() => onPick(item)}>
             <Text style={[styles.rowPickTitle, { color: c.text }]}>{item.nombre}</Text>
             <Text style={[styles.rowPickSub, { color: c.textSecondary }]}>
-              {item.codigo} · ${item.precioVenta.toFixed(0)}
+              {item.codigo} · {formatCurrency(item.precioVenta)}
             </Text>
           </Pressable>
         ))}

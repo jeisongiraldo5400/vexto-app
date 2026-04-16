@@ -9,7 +9,9 @@ import { useAlmacenesQuery } from '@/admin/sales/hooks/use-almacenes-query';
 import { useCreateVentaMutation } from '@/admin/sales/hooks/use-create-venta-mutation';
 import { useMetodosPagoQuery } from '@/admin/sales/hooks/use-metodos-pago-query';
 import { useResolveProductoBarcodeMutation } from '@/admin/sales/hooks/use-resolve-producto-barcode-mutation';
+import { useStockProductoQuery } from '@/admin/sales/hooks/use-stock-producto-query';
 import { primaryGlowShadow, Colors } from '@/constants/theme';
+import { formatCurrency } from '@/core/format';
 import { ApiError } from '@/core/http/api';
 import type { Producto, VentaResponse } from '@/core/types';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -57,6 +59,14 @@ export default function VentaScreen() {
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [qtyModalProduct, setQtyModalProduct] = useState<Producto | null>(null);
 
+  // Stock del producto seleccionado en el almacén elegido
+  const stockQ = useStockProductoQuery(qtyModalProduct?.id ?? null, almacenId);
+  const stockDisponible: number | null = stockQ.isSuccess
+    ? stockQ.data.cantidadDisponible
+    : stockQ.isError
+      ? 0
+      : null;
+
   const loadMeta = almacenesQ.isLoading || metodosQ.isLoading;
   const metaErr =
     almacenesQ.isError || metodosQ.isError
@@ -68,24 +78,35 @@ export default function VentaScreen() {
     setQtyModalProduct(producto);
   }, []);
 
-  const confirmQuantity = useCallback((producto: Producto, qty: number) => {
-    setCart((prev) => {
-      const i = prev.findIndex((l) => l.producto.id === producto.id);
-      if (i === -1) return [...prev, { producto, cantidad: qty }];
-      const next = [...prev];
-      next[i] = { ...next[i], cantidad: qty };
-      return next;
-    });
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setQtyModalProduct(null);
-  }, []);
+  const confirmQuantity = useCallback(
+    (producto: Producto, qty: number) => {
+      setCart((prev) => {
+        const i = prev.findIndex((l) => l.producto.id === producto.id);
+        const stock = stockQ.isSuccess ? stockQ.data.cantidadDisponible : null;
+        if (i === -1) return [...prev, { producto, cantidad: qty, stockDisponible: stock }];
+        const next = [...prev];
+        next[i] = { ...next[i], cantidad: qty, stockDisponible: stock };
+        return next;
+      });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setQtyModalProduct(null);
+    },
+    [stockQ],
+  );
 
   const setQty = (productoId: string, qty: number) => {
     if (qty < 1) {
       setCart((p) => p.filter((l) => l.producto.id !== productoId));
       return;
     }
-    setCart((p) => p.map((l) => (l.producto.id === productoId ? { ...l, cantidad: qty } : l)));
+    setCart((p) =>
+      p.map((l) => {
+        if (l.producto.id !== productoId) return l;
+        const capped =
+          l.stockDisponible !== null ? Math.min(qty, l.stockDisponible) : qty;
+        return { ...l, cantidad: capped };
+      }),
+    );
   };
 
   const onBarcodeFromScanner = useCallback(
@@ -194,7 +215,7 @@ export default function VentaScreen() {
 
         <View style={[styles.totalRow, { borderTopColor: c.border }]}>
           <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Total aprox.</Text>
-          <Text style={[styles.totalValue, { color: c.text }]}>${totalEstimado.toFixed(0)}</Text>
+          <Text style={[styles.totalValue, { color: c.text }]}>{formatCurrency(totalEstimado)}</Text>
         </View>
 
         {submitErr ? <Text style={[styles.warn, { color: c.error }]}>{submitErr}</Text> : null}
@@ -238,6 +259,7 @@ export default function VentaScreen() {
       <QuantityNumpadModal
         visible={qtyModalProduct !== null}
         product={qtyModalProduct}
+        stockDisponible={stockDisponible}
         onConfirm={(qty) => {
           if (qtyModalProduct) confirmQuantity(qtyModalProduct, qty);
         }}
