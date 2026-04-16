@@ -1,8 +1,8 @@
-import { useAuth } from '@/admin/auth/hooks/use-auth';
 import { useProductosQuery } from '@/admin/products/hooks/use-productos-query';
 import { BarcodeScannerModal } from '@/admin/sales/components/barcode-scanner-modal';
 import { CartLinesList, type CartLine } from '@/admin/sales/components/cart-lines-list';
 import { ProductSearchPicker } from '@/admin/sales/components/product-search-picker';
+import { QuantityNumpadModal } from '@/admin/sales/components/quantity-numpad-modal';
 import { VentaSuccessModal } from '@/admin/sales/components/venta-success-modal';
 import { WarehousePaymentPicker } from '@/admin/sales/components/warehouse-payment-picker';
 import { useAlmacenesQuery } from '@/admin/sales/hooks/use-almacenes-query';
@@ -20,7 +20,6 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function VentaScreen() {
-  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
@@ -56,6 +55,7 @@ export default function VentaScreen() {
 
   const [success, setSuccess] = useState<VentaResponse | null>(null);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
+  const [qtyModalProduct, setQtyModalProduct] = useState<Producto | null>(null);
 
   const loadMeta = almacenesQ.isLoading || metodosQ.isLoading;
   const metaErr =
@@ -63,15 +63,21 @@ export default function VentaScreen() {
       ? 'No se pudieron cargar almacén o métodos de pago. Revisa la conexión.'
       : null;
 
-  const addOrIncrement = useCallback((producto: Producto) => {
+  const openQuantityModal = useCallback((producto: Producto) => {
+    setScannerOpen(false);
+    setQtyModalProduct(producto);
+  }, []);
+
+  const confirmQuantity = useCallback((producto: Producto, qty: number) => {
     setCart((prev) => {
       const i = prev.findIndex((l) => l.producto.id === producto.id);
-      if (i === -1) return [...prev, { producto, cantidad: 1 }];
+      if (i === -1) return [...prev, { producto, cantidad: qty }];
       const next = [...prev];
-      next[i] = { ...next[i], cantidad: next[i].cantidad + 1 };
+      next[i] = { ...next[i], cantidad: qty };
       return next;
     });
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setQtyModalProduct(null);
   }, []);
 
   const setQty = (productoId: string, qty: number) => {
@@ -88,15 +94,14 @@ export default function VentaScreen() {
         setScanFeedback(null);
         try {
           const p = await resolveBarcode.mutateAsync(code);
-          addOrIncrement(p);
-          setScanFeedback(`${p.nombre} agregado`);
+          openQuantityModal(p);
         } catch {
           setScanFeedback('Producto no encontrado. Revisa el código o el catálogo.');
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
       })();
     },
-    [addOrIncrement, resolveBarcode],
+    [openQuantityModal, resolveBarcode],
   );
 
   const totalEstimado = useMemo(
@@ -111,7 +116,7 @@ export default function VentaScreen() {
       return;
     }
     if (cart.length === 0) {
-      setSubmitErr('Agrega productos escaneando. Si la cámara falla, usa la búsqueda de respaldo.');
+      setSubmitErr('Agrega al menos un producto al carrito.');
       return;
     }
     try {
@@ -131,7 +136,7 @@ export default function VentaScreen() {
   function openScanner() {
     setScanFeedback(null);
     if (Platform.OS === 'web') {
-      setScanFeedback('En web no hay cámara para escanear. Cierra y usa la búsqueda de respaldo arriba.');
+      setScanFeedback('En web no hay cámara. Usa la búsqueda abajo.');
       setScannerOpen(true);
       return;
     }
@@ -153,15 +158,7 @@ export default function VentaScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <Text style={[styles.welcome, { color: c.text }]}>
-          Hola{user?.fullName ? `, ${user.fullName}` : ''}
-        </Text>
-
         {metaErr ? <Text style={[styles.warn, { color: c.warning }]}>{metaErr}</Text> : null}
-
-        <Text style={[styles.flowHint, { color: c.textSecondary }]}>
-          Para vender: escanea cada producto con la cámara.
-        </Text>
 
         <Pressable
           style={({ pressed }) => [
@@ -178,12 +175,12 @@ export default function VentaScreen() {
           onBusquedaChange={setBusqueda}
           resultados={resultados}
           loading={productosQ.isFetching}
-          onPick={addOrIncrement}
+          onPick={openQuantityModal}
         />
 
         <CartLinesList cart={cart} onChangeQty={setQty} />
 
-        <Text style={[styles.sectionMeta, { color: c.text }]}>Antes de confirmar</Text>
+        <Text style={[styles.sectionMeta, { color: c.text }]}>Almacén y pago</Text>
         <WarehousePaymentPicker
           almacenes={almacenes}
           metodos={metodos}
@@ -195,9 +192,10 @@ export default function VentaScreen() {
           onMetodo={setMetodoPagoId}
         />
 
-        <Text style={[styles.total, { color: c.text }]}>
-          Total aprox: ${totalEstimado.toFixed(0)}
-        </Text>
+        <View style={[styles.totalRow, { borderTopColor: c.border }]}>
+          <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Total aprox.</Text>
+          <Text style={[styles.totalValue, { color: c.text }]}>${totalEstimado.toFixed(0)}</Text>
+        </View>
 
         {submitErr ? <Text style={[styles.warn, { color: c.error }]}>{submitErr}</Text> : null}
 
@@ -236,22 +234,38 @@ export default function VentaScreen() {
         onPrimary={c.onPrimary}
         onClose={() => setSuccess(null)}
       />
+
+      <QuantityNumpadModal
+        visible={qtyModalProduct !== null}
+        product={qtyModalProduct}
+        onConfirm={(qty) => {
+          if (qtyModalProduct) confirmQuantity(qtyModalProduct, qty);
+        }}
+        onCancel={() => setQtyModalProduct(null)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scroll: { paddingHorizontal: 16, paddingTop: 8 },
+  scroll: { paddingHorizontal: 16, paddingTop: 10 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  welcome: { fontSize: 20, fontWeight: '600', marginBottom: 8 },
   muted: { fontSize: 16, paddingVertical: 8 },
-  warn: { marginBottom: 8, fontSize: 15 },
-  flowHint: { fontSize: 16, marginBottom: 10, lineHeight: 22 },
-  sectionMeta: { fontSize: 15, fontWeight: '700', marginTop: 12, marginBottom: 6 },
-  scanBtn: { borderRadius: 12, paddingVertical: 18, alignItems: 'center', marginBottom: 8 },
-  scanBtnText: { fontSize: 19, fontWeight: '700' },
-  total: { fontSize: 18, fontWeight: '700', marginTop: 8, marginBottom: 8 },
-  confirm: { borderRadius: 12, paddingVertical: 18, alignItems: 'center' },
-  confirmText: { fontSize: 19, fontWeight: '700' },
+  warn: { marginBottom: 8, fontSize: 14 },
+  sectionMeta: { fontSize: 14, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  scanBtn: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginBottom: 12 },
+  scanBtnText: { fontSize: 17, fontWeight: '700' },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  totalLabel: { fontSize: 15, fontWeight: '600' },
+  totalValue: { fontSize: 22, fontWeight: '800' },
+  confirm: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 14 },
+  confirmText: { fontSize: 17, fontWeight: '700' },
 });

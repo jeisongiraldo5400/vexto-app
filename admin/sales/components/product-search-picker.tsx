@@ -1,7 +1,6 @@
 import { Colors } from '@/constants/theme';
 import type { Producto } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Fragment } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 type Props = {
@@ -17,11 +16,8 @@ export function ProductSearchPicker({ busqueda, onBusquedaChange, resultados, lo
   const c = Colors[scheme ?? 'light'];
 
   return (
-    <Fragment>
-      <Text style={[styles.sectionLabel, { color: c.text }]}>Respaldo: sin cámara o sin código en el sistema</Text>
-      <Text style={[styles.sectionSub, { color: c.textSecondary }]}>
-        Busca por nombre o código y toca un producto para agregarlo.
-      </Text>
+    <View style={[styles.wrap, { borderColor: c.border, backgroundColor: c.card }]}>
+      <Text style={[styles.label, { color: c.text }]}>Búsqueda manual</Text>
       <TextInput
         style={[
           styles.search,
@@ -31,19 +27,19 @@ export function ProductSearchPicker({ busqueda, onBusquedaChange, resultados, lo
             color: c.text,
           },
         ]}
-        placeholder="Nombre o código"
+        placeholder="Nombre o código (2+ letras)"
         value={busqueda}
         onChangeText={onBusquedaChange}
         placeholderTextColor={c.textMuted}
       />
-      {loading ? <ActivityIndicator color={c.tint} /> : null}
+      {loading ? <ActivityIndicator color={c.tint} style={{ marginBottom: 8 }} /> : null}
       <View style={styles.results}>
         {resultados.map((item) => (
           <Pressable
             key={item.id}
             style={[
               styles.rowPick,
-              { backgroundColor: c.card, borderColor: c.cardBorder },
+              { backgroundColor: c.backgroundPaper, borderColor: c.cardBorder },
             ]}
             onPress={() => onPick(item)}>
             <Text style={[styles.rowPickTitle, { color: c.text }]}>{item.nombre}</Text>
@@ -53,17 +49,23 @@ export function ProductSearchPicker({ busqueda, onBusquedaChange, resultados, lo
           </Pressable>
         ))}
       </View>
-    </Fragment>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionLabel: { fontSize: 15, fontWeight: '700', marginTop: 12, marginBottom: 4 },
-  sectionSub: { fontSize: 14, marginBottom: 8 },
+  wrap: {
+    marginTop: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+  },
+  label: { fontSize: 13, fontWeight: '700', marginBottom: 8 },
   search: {
     borderRadius: 10,
-    padding: 14,
-    fontSize: 17,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 16,
     borderWidth: 1,
     marginBottom: 8,
   },
@@ -73,9 +75,8 @@ const styles = StyleSheet.create({
   rowPick: {
     padding: 12,
     borderRadius: 10,
-    marginBottom: 6,
     borderWidth: 1,
   },
-  rowPickTitle: { fontSize: 16, fontWeight: '600' },
-  rowPickSub: { fontSize: 14, marginTop: 2 },
+  rowPickTitle: { fontSize: 15, fontWeight: '600' },
+  rowPickSub: { fontSize: 13, marginTop: 2 },
 });

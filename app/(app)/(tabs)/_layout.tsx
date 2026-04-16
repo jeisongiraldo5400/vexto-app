@@ -4,7 +4,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Tabs } from 'expo-router';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 function HeaderRight() {
   const scheme = useColorScheme();
@@ -21,10 +21,26 @@ function HeaderRight() {
   );
 }
 
+function HeaderTitleVenta() {
+  const scheme = useColorScheme();
+  const c = Colors[scheme ?? 'light'];
+  const { user } = useAuth();
+  const name = user?.fullName?.trim() || user?.email?.split('@')[0] || '';
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Text style={{ fontSize: 17, fontWeight: '700', color: c.text }}>Venta</Text>
+      {name ? (
+        <Text style={{ fontSize: 12, fontWeight: '500', color: c.textSecondary, marginTop: 2 }} numberOfLines={1}>
+          {name}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const c = Colors[colorScheme ?? 'light'];
-  const { user } = useAuth();
 
   return (
     <Tabs
@@ -36,7 +52,6 @@ export default function TabLayout() {
           borderTopColor: c.border,
         },
         headerShown: true,
-        headerTitle: user?.fullName ?? user?.email ?? 'Vexto',
         headerStyle: { backgroundColor: c.backgroundPaper },
         headerTintColor: c.text,
         headerTitleStyle: { fontWeight: '600', color: c.text },
@@ -48,6 +63,7 @@ export default function TabLayout() {
         options={{
           title: 'Venta',
           tabBarLabel: 'Venta',
+          headerTitle: () => <HeaderTitleVenta />,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="barcode.viewfinder" color={color} />,
         }}
       />
@@ -55,6 +71,7 @@ export default function TabLayout() {
         name="productos"
         options={{
           title: 'Productos',
+          headerTitle: 'Productos',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cube.box.fill" color={color} />,
         }}
       />
@@ -62,6 +79,7 @@ export default function TabLayout() {
         name="unidades"
         options={{
           title: 'Unidades',
+          headerTitle: 'Unidades',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="ruler.fill" color={color} />,
         }}
       />
