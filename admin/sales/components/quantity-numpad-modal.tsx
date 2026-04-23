@@ -28,10 +28,7 @@ type Props = {
   onCancel: () => void;
 };
 
-function parseQtyFromDigits(digits: string): number {
-  if (!digits || digits === '0') return 1;
-  const n = parseInt(digits, 10);
-  if (Number.isNaN(n) || n < 1) return 1;
+function clampQty(n: number): number {
   return Math.min(ABSOLUTE_MAX_QTY, n);
 }
 
@@ -61,14 +58,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
     (d: string) => {
       setDigits((prev) => {
         if (prev.length >= MAX_DIGITS) return prev;
-        let next: string;
-        if (prev === '1') {
-          if (d === '0') next = '10';
-          else if (d === '1') next = '11';
-          else next = d;
-        } else {
-          next = prev + d;
-        }
+        const next = prev + d;
         const n = parseInt(next, 10);
         if (!Number.isNaN(n) && n > maxQty) return prev;
         return next;
@@ -80,29 +70,33 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
 
   const backspace = useCallback(() => {
     setDigits((prev) => {
-      if (prev.length <= 1) return '1';
+      if (prev.length <= 1) return '';
       return prev.slice(0, -1);
     });
     void Haptics.selectionAsync();
   }, []);
 
   const clearAll = useCallback(() => {
-    setDigits('1');
+    setDigits('');
     void Haptics.selectionAsync();
   }, []);
 
   const handleConfirm = useCallback(() => {
     if (!product) return;
-    const qty = parseQtyFromDigits(digits);
-    onConfirm(qty);
+    const n = parseInt(digits, 10);
+    if (digits === '' || Number.isNaN(n) || n < 1) return;
+    onConfirm(clampQty(n));
   }, [digits, onConfirm, product]);
 
   if (!product) return null;
 
-  const previewQty = parseQtyFromDigits(digits);
-  const exceedsStock = stockDisponible !== null && previewQty > stockDisponible;
+  const parsed = digits === '' ? NaN : parseInt(digits, 10);
+  const isValidQty = digits !== '' && !Number.isNaN(parsed) && parsed >= 1;
+  const previewQty = isValidQty ? clampQty(parsed) : 0;
+  const exceedsStock =
+    stockDisponible !== null && isValidQty && previewQty > stockDisponible;
   const noStock = stockDisponible !== null && stockDisponible <= 0;
-  const confirmDisabled = exceedsStock || noStock;
+  const confirmDisabled = !isValidQty || exceedsStock || noStock;
 
   const keyStyle = (pressed: boolean) => [
     styles.key,
@@ -209,7 +203,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
               style={({ pressed }) => keyStyle(pressed)}
               onPress={clearAll}
               accessibilityLabel="Limpiar cantidad"
-              accessibilityHint="Deja la cantidad en 1">
+              accessibilityHint="Borra la cantidad escrita">
               <Text style={[styles.keySmall, { color: c.text }]}>Limpiar</Text>
             </Pressable>
             <Pressable
@@ -241,7 +235,9 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
                 ? 'Sin stock disponible'
                 : exceedsStock
                   ? 'Cantidad supera el stock'
-                  : 'Agregar al carrito'
+                  : !isValidQty
+                    ? 'Ingrese una cantidad válida'
+                    : 'Agregar al carrito'
             }>
             <Text style={[styles.confirmBtnText, { color: confirmDisabled ? c.textMuted : '#ffffff' }]}>
               {noStock ? 'Sin stock disponible' : 'Agregar al carrito'}
