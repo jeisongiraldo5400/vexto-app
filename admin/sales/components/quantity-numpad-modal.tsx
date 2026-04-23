@@ -36,7 +36,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
-  const [digits, setDigits] = useState('1');
+  const [digits, setDigits] = useState('0');
 
   const maxQty =
     stockDisponible !== null
@@ -45,7 +45,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
 
   useEffect(() => {
     if (visible && product) {
-      setDigits('1');
+      setDigits('0');
       if (Platform.OS === 'ios') {
         void AccessibilityInfo.announceForAccessibility(
           'Producto encontrado. Elija cuántas unidades con los números grandes y pulse agregar al carrito.',
@@ -57,8 +57,13 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
   const pushDigit = useCallback(
     (d: string) => {
       setDigits((prev) => {
-        if (prev.length >= MAX_DIGITS) return prev;
-        const next = prev + d;
+        let next: string;
+        if (prev === '' || prev === '0') {
+          next = d === '0' ? '0' : d;
+        } else {
+          if (prev.length >= MAX_DIGITS) return prev;
+          next = prev + d;
+        }
         const n = parseInt(next, 10);
         if (!Number.isNaN(n) && n > maxQty) return prev;
         return next;
@@ -70,14 +75,14 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
 
   const backspace = useCallback(() => {
     setDigits((prev) => {
-      if (prev.length <= 1) return '';
+      if (prev.length <= 1) return '0';
       return prev.slice(0, -1);
     });
     void Haptics.selectionAsync();
   }, []);
 
   const clearAll = useCallback(() => {
-    setDigits('');
+    setDigits('0');
     void Haptics.selectionAsync();
   }, []);
 
@@ -91,7 +96,8 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
   if (!product) return null;
 
   const parsed = digits === '' ? NaN : parseInt(digits, 10);
-  const isValidQty = digits !== '' && !Number.isNaN(parsed) && parsed >= 1;
+  const isValidQty =
+    digits !== '' && digits !== '0' && !Number.isNaN(parsed) && parsed >= 1;
   const previewQty = isValidQty ? clampQty(parsed) : 0;
   const exceedsStock =
     stockDisponible !== null && isValidQty && previewQty > stockDisponible;
@@ -203,7 +209,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
               style={({ pressed }) => keyStyle(pressed)}
               onPress={clearAll}
               accessibilityLabel="Limpiar cantidad"
-              accessibilityHint="Borra la cantidad escrita">
+              accessibilityHint="Deja la cantidad en cero">
               <Text style={[styles.keySmall, { color: c.text }]}>Limpiar</Text>
             </Pressable>
             <Pressable
