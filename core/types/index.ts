@@ -53,6 +53,28 @@ export type MetodoPago = {
   estado: string;
 };
 
+/** Respuesta de listado / creación de clientes (subset útil para POS). */
+export type Cliente = {
+  id: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
+  nombre: string;
+  apellido: string | null;
+  razonSocial: string | null;
+  telefono: string | null;
+};
+
+export type TipoDocumentoCliente = 'CC' | 'NIT' | 'CE' | 'TI' | 'PASAPORTE';
+
+export type CrearClientePayload = {
+  tipoDocumento: TipoDocumentoCliente;
+  numeroDocumento: string;
+  nombre: string;
+  apellido?: string;
+  razonSocial?: string;
+  telefono?: string;
+};
+
 export type StockInfo = {
   id: string;
   productoId: string;

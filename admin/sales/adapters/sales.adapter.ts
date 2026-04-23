@@ -5,6 +5,7 @@ export type CrearVentaPayload = {
   almacenId: string;
   metodoPagoId: string;
   items: { productoId: string; cantidad: number }[];
+  clienteId?: string;
 };
 
 export function fetchAlmacenes() {

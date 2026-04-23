@@ -1,10 +1,15 @@
 import { useProductosQuery } from '@/admin/products/hooks/use-productos-query';
 import { BarcodeScannerModal } from '@/admin/sales/components/barcode-scanner-modal';
+import {
+  ClienteVentaSection,
+  type ModoClienteVenta,
+} from '@/admin/sales/components/cliente-venta-section';
 import { CartLinesList, type CartLine } from '@/admin/sales/components/cart-lines-list';
 import { ProductSearchPicker } from '@/admin/sales/components/product-search-picker';
 import { QuantityNumpadModal } from '@/admin/sales/components/quantity-numpad-modal';
 import { VentaSuccessModal } from '@/admin/sales/components/venta-success-modal';
 import { WarehousePaymentPicker } from '@/admin/sales/components/warehouse-payment-picker';
+import { esMetodoPagoCredito } from '@/admin/sales/constants/metodos-pago';
 import { useAlmacenesQuery } from '@/admin/sales/hooks/use-almacenes-query';
 import { useCreateVentaMutation } from '@/admin/sales/hooks/use-create-venta-mutation';
 import { useMetodosPagoQuery } from '@/admin/sales/hooks/use-metodos-pago-query';
@@ -13,7 +18,7 @@ import { useStockProductoQuery } from '@/admin/sales/hooks/use-stock-producto-qu
 import { primaryGlowShadow, Colors } from '@/constants/theme';
 import { formatCurrency } from '@/core/format';
 import { ApiError } from '@/core/http/api';
-import type { Producto, VentaResponse } from '@/core/types';
+import type { Cliente, Producto, VentaResponse } from '@/core/types';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
@@ -45,6 +50,20 @@ export default function VentaScreen() {
     if (almacenes.length === 1) setAlmacenId(almacenes[0].id);
     if (metodos.length >= 1) setMetodoPagoId(metodos[0].id);
   }, [almacenes, metodos]);
+
+  const [modoCliente, setModoCliente] = useState<ModoClienteVenta>('ninguno');
+  const [clienteVenta, setClienteVenta] = useState<Cliente | null>(null);
+
+  const metodoSeleccionado = useMemo(
+    () => metodos.find((m) => m.id === metodoPagoId) ?? null,
+    [metodos, metodoPagoId],
+  );
+
+  useEffect(() => {
+    if (esMetodoPagoCredito(metodoSeleccionado?.codigo) && modoCliente === 'ninguno') {
+      setModoCliente('existente');
+    }
+  }, [metodoSeleccionado?.codigo, modoCliente]);
 
   const [cart, setCart] = useState<CartLine[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -140,14 +159,21 @@ export default function VentaScreen() {
       setSubmitErr('Agrega al menos un producto al carrito.');
       return;
     }
+    if (esMetodoPagoCredito(metodoSeleccionado?.codigo) && !clienteVenta) {
+      setSubmitErr('Selecciona o crea un cliente para ventas a crédito.');
+      return;
+    }
     try {
       const v = await createVenta.mutateAsync({
         almacenId,
         metodoPagoId,
         items: cart.map((l) => ({ productoId: l.producto.id, cantidad: l.cantidad })),
+        ...(clienteVenta ? { clienteId: clienteVenta.id } : {}),
       });
       setSuccess(v);
       setCart([]);
+      setClienteVenta(null);
+      setModoCliente('ninguno');
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : 'No se pudo registrar la venta.';
       setSubmitErr(msg);
@@ -200,6 +226,17 @@ export default function VentaScreen() {
         />
 
         <CartLinesList cart={cart} onChangeQty={setQty} />
+
+        <ClienteVentaSection
+          modo={modoCliente}
+          onModo={setModoCliente}
+          cliente={clienteVenta}
+          onCliente={setClienteVenta}
+          metodoPago={metodoSeleccionado}
+          tint={c.tint}
+          tintMuted={c.tintMuted}
+          onPrimary={c.onPrimary}
+        />
 
         <Text style={[styles.sectionMeta, { color: c.text }]}>Almacén y pago</Text>
         <WarehousePaymentPicker
