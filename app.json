@@ -15,8 +15,10 @@
         "NSLocalNetworkUsageDescription": "Vexto accede al servidor en tu red local (Wi‑Fi) para sincronizar inventario y ventas.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
-      }
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.jeison5400.vextoapp"
     },
     "android": {
       "usesCleartextTraffic": true,
