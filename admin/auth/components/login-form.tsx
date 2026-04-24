@@ -8,6 +8,7 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,6 +19,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const logoVexto = require('../../../assets/logo/vexto.png') as number;
 
 export function LoginForm() {
   const { signIn } = useAuth();
@@ -56,13 +59,14 @@ export function LoginForm() {
         style={[styles.hero, { paddingTop: insets.top + 20, paddingBottom: 52 }]}>
         <View style={styles.heroDecor1} />
         <View style={styles.heroDecor2} />
-        <LinearGradient
-          colors={[...BrandGradient.logo]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.logoTile, primaryGlowShadow()]}>
-          <Text style={styles.logoTileText}>VE</Text>
-        </LinearGradient>
+        <View style={[styles.logoTile, primaryGlowShadow()]}>
+          <Image
+            source={logoVexto}
+            style={styles.logoImage}
+            resizeMode="cover"
+            accessibilityLabel="Vexto"
+          />
+        </View>
         <Text style={styles.heroTitle}>Vexto</Text>
         <Text style={styles.heroSubtitle}>Inventario y ventas para tu negocio</Text>
       </LinearGradient>
@@ -205,15 +209,12 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
     marginBottom: 14,
   },
-  logoTileText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   heroTitle: {
     color: '#ffffff',
