@@ -3,6 +3,7 @@ import { Brand, BrandGradient, cardElevationShadow, Colors, primaryGlowShadow } 
 import { ApiError } from '@/core/http/api';
 import { getApiBaseUrl } from '@/core/config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { useState } from 'react';
@@ -21,6 +22,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const logoVexto = require('../../../assets/logo/vexto.png') as number;
+
+const appVersion = Constants.expoConfig?.version?.trim() || '';
 
 export function LoginForm() {
   const { signIn } = useAuth();
@@ -168,6 +171,12 @@ export function LoginForm() {
               </Pressable>
             </Link>
 
+            {appVersion ? (
+              <Text style={[styles.versionLine, { color: c.textMuted }]} accessibilityLabel={`Versión ${appVersion}`}>
+                Versión {appVersion}
+              </Text>
+            ) : null}
+
             <Text style={[styles.footer, { color: c.textMuted }]}>© {new Date().getFullYear()} Vexto</Text>
           </View>
         </ScrollView>
@@ -307,6 +316,11 @@ const styles = StyleSheet.create({
   link: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  versionLine: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
   },
   footer: {
     fontSize: 11,
