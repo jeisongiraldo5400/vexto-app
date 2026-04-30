@@ -46,6 +46,7 @@ export function NuevoClienteModal({ visible, tint, onPrimary, onClose, onCreated
   const [apellido, setApellido] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [email, setEmail] = useState('');
   const [formErr, setFormErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,11 +57,16 @@ export function NuevoClienteModal({ visible, tint, onPrimary, onClose, onCreated
       setApellido('');
       setRazonSocial('');
       setTelefono('');
+      setEmail('');
       setFormErr(null);
     }
   }, [visible]);
 
   const isNit = tipoDocumento === 'NIT';
+
+  function isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
 
   async function submit() {
     setFormErr(null);
@@ -82,6 +88,16 @@ export function NuevoClienteModal({ visible, tint, onPrimary, onClose, onCreated
       }
     }
 
+    const emailTrim = email.trim();
+    if (!emailTrim) {
+      setFormErr('El correo electrónico es obligatorio.');
+      return;
+    }
+    if (!isValidEmail(emailTrim)) {
+      setFormErr('Correo inválido.');
+      return;
+    }
+
     try {
       const payload = {
         tipoDocumento,
@@ -90,6 +106,7 @@ export function NuevoClienteModal({ visible, tint, onPrimary, onClose, onCreated
         ...(isNit ? { razonSocial: razonSocial.trim() } : {}),
         ...(!isNit && apellido.trim() ? { apellido: apellido.trim() } : {}),
         ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
+        email: emailTrim,
       };
       const cliente = await crear.mutateAsync(payload);
       onCreated(cliente);
@@ -195,6 +212,20 @@ export function NuevoClienteModal({ visible, tint, onPrimary, onClose, onCreated
               placeholder="Opcional"
               placeholderTextColor={c.textMuted}
               keyboardType="phone-pad"
+            />
+
+            <Text style={[styles.label, { color: c.textSecondary }]}>Correo electrónico</Text>
+            <TextInput
+              style={[
+                styles.input,
+                { backgroundColor: c.inputBackground, borderColor: c.inputBorder, color: c.text },
+              ]}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Requerido"
+              placeholderTextColor={c.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
 
             {formErr ? <Text style={[styles.err, { color: c.error }]}>{formErr}</Text> : null}

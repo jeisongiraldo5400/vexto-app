@@ -62,6 +62,7 @@ export type Cliente = {
   apellido: string | null;
   razonSocial: string | null;
   telefono: string | null;
+  email?: string | null;
 };
 
 export type TipoDocumentoCliente = 'CC' | 'NIT' | 'CE' | 'TI' | 'PASAPORTE';
@@ -70,6 +71,7 @@ export type CrearClientePayload = {
   tipoDocumento: TipoDocumentoCliente;
   numeroDocumento: string;
   nombre: string;
+  email: string;
   apellido?: string;
   razonSocial?: string;
   telefono?: string;
