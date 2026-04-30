@@ -34,7 +34,7 @@ type Props = {
   onCreated: (c: Cliente) => void;
 };
 
-export function NuevoClienteModal({ visible, tint, onPrimary, onClose, onCreated }: Props) {
+export function NuevoClienteModal ({ visible, tint, onPrimary, onClose, onCreated }: Props) {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
@@ -64,11 +64,11 @@ export function NuevoClienteModal({ visible, tint, onPrimary, onClose, onCreated
 
   const isNit = tipoDocumento === 'NIT';
 
-  function isValidEmail(value: string) {
+  function isValidEmail (value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   }
 
-  async function submit() {
+  async function submit () {
     setFormErr(null);
     const doc = numeroDocumento.trim();
     if (!doc) {
