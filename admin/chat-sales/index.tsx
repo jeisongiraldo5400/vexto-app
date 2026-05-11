@@ -48,15 +48,18 @@ export default function ChatVentaScreen() {
     }, 100);
   }, []);
 
-  // Android: escuchar altura del teclado para elevar la barra de entrada.
+  // Escuchar altura del teclado para elevar la barra de entrada.
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
+    const showSubscription = Keyboard.addListener(showEvent, (e) => {
+      Keyboard.scheduleLayoutAnimation(e);
       setKeyboardHeight(e.endCoordinates.height);
       setTimeout(() => scrollToEnd(), 150);
     });
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+    const hideSubscription = Keyboard.addListener(hideEvent, (e) => {
+      Keyboard.scheduleLayoutAnimation(e);
       setKeyboardHeight(0);
     });
 
@@ -66,8 +69,8 @@ export default function ChatVentaScreen() {
     };
   }, [scrollToEnd]);
 
-  const keyboardOpen = Platform.OS === 'android' && keyboardHeight > 0;
-  const bottomSpacerHeight = keyboardOpen ? keyboardHeight : insets.bottom;
+  const keyboardOpen = keyboardHeight > 0;
+  const bottomSpacerHeight = keyboardOpen ? Math.max(keyboardHeight - insets.bottom + 4, 0) : insets.bottom;
   const listBottomPadding = keyboardOpen ? 16 : insets.bottom + 16;
 
   const handleResponse = useCallback(
@@ -121,6 +124,8 @@ export default function ChatVentaScreen() {
 
   const handleSend = useCallback(
     async (text: string) => {
+      Keyboard.dismiss();
+
       const userMsgId = generateId();
       addMessage({
         id: userMsgId,
@@ -329,8 +334,8 @@ export default function ChatVentaScreen() {
 
       <View style={styles.chatBody}>
         {messages.length === 0 ? (
-          <View style={styles.listContainer}>
-            <View style={styles.emptyState}>
+          <Pressable style={styles.listContainer} onPress={Keyboard.dismiss} accessible={false}>
+            <View style={[styles.emptyState, keyboardOpen && styles.emptyStateKeyboardOpen]}>
               <Text style={[styles.emptyTitle, { color: c.text }]}>
                 ¡Hola! 👋
               </Text>
@@ -362,7 +367,7 @@ export default function ChatVentaScreen() {
                 ))}
               </View>
             </View>
-          </View>
+          </Pressable>
         ) : (
           <FlatList
             ref={listRef}
@@ -441,7 +446,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    paddingBottom: 24,
     gap: 12,
+  },
+  emptyStateKeyboardOpen: {
+    justifyContent: 'flex-start',
+    paddingTop: 24,
+    paddingBottom: 12,
   },
   emptyTitle: {
     fontSize: 22,
