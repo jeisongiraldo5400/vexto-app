@@ -2,7 +2,7 @@
   "expo": {
     "name": "Vexto",
     "slug": "vexto-app",
-    "version": "1.1.1",
+    "version": "1.2.2",
     "orientation": "portrait",
     "icon": "./assets/logo/vexto.png",
     "scheme": "vextoapp",
