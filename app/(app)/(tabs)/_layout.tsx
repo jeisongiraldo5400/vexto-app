@@ -83,6 +83,14 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cube.box.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="chat-venta"
+        options={{
+          title: 'Chat',
+          headerTitle: 'Venta por Chat',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="bubble.left.and.bubble.right" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

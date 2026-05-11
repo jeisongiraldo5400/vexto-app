@@ -21,6 +21,7 @@ const MAPPING = {
   'barcode.viewfinder': 'qr-code-scanner',
   'cube.box.fill': 'inventory-2',
   'ruler.fill': 'straighten',
+  'bubble.left.and.bubble.right': 'chat-bubble',
 } as IconMapping;
 
 /**

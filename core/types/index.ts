@@ -96,4 +96,87 @@ export type VentaResponse = {
     precioUnitario: number;
     subtotal: number;
   }[];
+  total: number;
+};
+
+/* ─── Chat Ventas NLP ─── */
+export type ChatVentaStatus =
+  | 'success'
+  | 'ambiguous'
+  | 'not_found'
+  | 'needs_price'
+  | 'needs_price_confirmation'
+  | 'insufficient_stock'
+  | 'clarification'
+  | 'invalid_input';
+
+export type ChatVentaOption = {
+  id: string;
+  nombre: string;
+  precioVenta: number;
+  stockDisponible: number;
+};
+
+export type ChatVentaResponse = {
+  status: ChatVentaStatus;
+  mensaje: string;
+  venta?: VentaResponse;
+  opciones?: ChatVentaOption[];
+  intencionPendiente?: {
+    nombreProducto: string;
+    cantidad: number;
+    precioUnitario?: number;
+  };
+  // Campos para confirmación de precio
+  precioSugerido?: number;
+  precioRegistrado?: number;
+  precioMinimoPermitido?: number;
+};
+
+export type ChatVentaRequest = {
+  mensaje: string;
+  sessionId: string;
+  contexto?: {
+    productoDisambiguar?: string;
+    confirmarPrecio?: boolean; // true = usar precio sugerido, false = usar registrado
+    ultimaIntencion?: {
+      nombreProducto?: string;
+      cantidad?: number;
+      precioUnitario?: number;
+    };
+  };
+};
+
+export type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  status?: 'sending' | 'sent' | 'error';
+  action?:
+    | {
+        type: 'disambiguation';
+        options: ChatVentaOption[];
+        intencionPendiente: {
+          nombreProducto: string;
+          cantidad: number;
+          precioUnitario?: number;
+        };
+      }
+    | {
+        type: 'price_confirmation';
+        precioSugerido: number;
+        precioRegistrado: number;
+        precioMinimoPermitido: number;
+        bloqueado: boolean; // true = por debajo del mínimo (solo puede usar registrado)
+        intencionPendiente: {
+          nombreProducto: string;
+          cantidad: number;
+          precioUnitario?: number;
+        };
+      }
+    | {
+        type: 'success';
+        venta: VentaResponse;
+      };
 };
