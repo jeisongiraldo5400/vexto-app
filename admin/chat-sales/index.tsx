@@ -7,11 +7,11 @@ import { ApiError } from '@/core/http/api';
 import type { ChatMessage } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -30,7 +30,6 @@ export default function ChatVentaScreen() {
   const c = Colors[scheme ?? 'light'];
 
   const messages = useChatStore((s) => s.messages);
-  const isLoading = useChatStore((s) => s.isLoading);
   const contexto = useChatStore((s) => s.contexto);
   const sessionId = useChatStore((s) => s.sessionId);
   const addMessage = useChatStore((s) => s.addMessage);
@@ -41,12 +40,35 @@ export default function ChatVentaScreen() {
 
   const sendMutation = useSendChatMessageMutation();
   const listRef = useRef<FlatList>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const scrollToEnd = useCallback(() => {
     setTimeout(() => {
       listRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, []);
+
+  // Android: escuchar altura del teclado para elevar la barra de entrada.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setTimeout(() => scrollToEnd(), 150);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [scrollToEnd]);
+
+  const keyboardOpen = Platform.OS === 'android' && keyboardHeight > 0;
+  const bottomSpacerHeight = keyboardOpen ? keyboardHeight : insets.bottom;
+  const listBottomPadding = keyboardOpen ? 16 : insets.bottom + 16;
 
   const handleResponse = useCallback(
     (res: { status: string; mensaje: string; venta?: any; opciones?: any[]; intencionPendiente?: any; precioSugerido?: number; precioRegistrado?: number; precioMinimoPermitido?: number }) => {
@@ -283,10 +305,7 @@ export default function ChatVentaScreen() {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.screen, { backgroundColor: c.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
       <View style={[styles.header, { backgroundColor: c.backgroundPaper, borderBottomColor: c.border }]}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: c.text }]}>Venta por Chat</Text>
@@ -308,81 +327,93 @@ export default function ChatVentaScreen() {
         )}
       </View>
 
-      {messages.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>
-            ¡Hola! 👋
-          </Text>
-          <Text style={[styles.emptyDesc, { color: c.textSecondary }]}>
-            Escribe algo como:
-          </Text>
-          <View style={styles.examples}>
-            {[
-              'vendí 8 cervezas a 3500',
-              'se fueron 3 arroz',
-              'una gaseosa',
-              '5 papel higiénico',
-            ].map((ex) => (
-              <Pressable
-                key={ex}
-                style={({ pressed }) => [
-                  styles.exampleChip,
-                  {
-                    backgroundColor: c.card,
-                    borderColor: c.border,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
-                onPress={() => handleSend(ex)}>
-                <Text style={[styles.exampleText, { color: c.text }]}>
-                  "{ex}"
-                </Text>
-              </Pressable>
-            ))}
+      <View style={styles.chatBody}>
+        {messages.length === 0 ? (
+          <View style={styles.listContainer}>
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>
+                ¡Hola! 👋
+              </Text>
+              <Text style={[styles.emptyDesc, { color: c.textSecondary }]}>
+                Escribe algo como:
+              </Text>
+              <View style={styles.examples}>
+                {[
+                  'vendí 8 cervezas a 3500',
+                  'se fueron 3 arroz',
+                  'una gaseosa',
+                  '5 papel higiénico',
+                ].map((ex) => (
+                  <Pressable
+                    key={ex}
+                    style={({ pressed }) => [
+                      styles.exampleChip,
+                      {
+                        backgroundColor: c.card,
+                        borderColor: c.border,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                    onPress={() => handleSend(ex)}>
+                    <Text style={[styles.exampleText, { color: c.text }]}>
+                      {`"${ex}"`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
           </View>
-        </View>
-      ) : (
-        <FlatList
-          ref={listRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ChatMessageBubble
-              message={item}
-              onSelectOption={
-                item.role === 'assistant' && item.action?.type === 'disambiguation'
-                  ? handleSelectOption
-                  : undefined
-              }
-              onConfirmPrice={
-                item.role === 'assistant' && item.action?.type === 'price_confirmation'
-                  ? handleConfirmPrice
-                  : undefined
-              }
-            />
-          )}
-          contentContainerStyle={{
-            paddingTop: 8,
-            paddingBottom: insets.bottom + 8,
-          }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        ) : (
+          <FlatList
+            ref={listRef}
+            style={styles.listContainer}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ChatMessageBubble
+                message={item}
+                onSelectOption={
+                  item.role === 'assistant' && item.action?.type === 'disambiguation'
+                    ? handleSelectOption
+                    : undefined
+                }
+                onConfirmPrice={
+                  item.role === 'assistant' && item.action?.type === 'price_confirmation'
+                    ? handleConfirmPrice
+                    : undefined
+                }
+              />
+            )}
+            contentContainerStyle={{
+              paddingTop: 8,
+              paddingBottom: listBottomPadding,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          />
+        )}
 
-      {sendMutation.isPending && messages.length > 0 && messages[messages.length - 1]?.status === 'sending' && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="small" color={c.tint} />
-        </View>
-      )}
+        {sendMutation.isPending && messages.length > 0 && messages[messages.length - 1]?.status === 'sending' && (
+          <View style={[styles.loadingOverlay, { bottom: bottomSpacerHeight + 60 }]}>
+            <ActivityIndicator size="small" color={c.tint} />
+          </View>
+        )}
 
-      <ChatInputBar onSend={handleSend} disabled={sendMutation.isPending} />
-    </KeyboardAvoidingView>
+        <ChatInputBar onSend={handleSend} disabled={sendMutation.isPending} />
+        <View style={{ height: bottomSpacerHeight }} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
+    flex: 1,
+  },
+  chatBody: {
+    flex: 1,
+  },
+  listContainer: {
     flex: 1,
   },
   header: {
@@ -437,7 +468,6 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     position: 'absolute',
-    bottom: 60,
     alignSelf: 'center',
   },
 });
