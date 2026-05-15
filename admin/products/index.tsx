@@ -5,7 +5,8 @@ import { useAlmacenesQuery } from '@/admin/sales/hooks/use-almacenes-query';
 import { Colors } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -22,9 +23,11 @@ export default function ProductosScreen() {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
+  const queryClient = useQueryClient();
 
   const [q, setQ] = useState('');
   const debounced = useDebouncedValue(q, 300);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { data, isLoading, isError, error } = useProductosQuery(debounced, { minChars: 0 });
   const almacenesQ = useAlmacenesQuery();
@@ -54,6 +57,15 @@ export default function ProductosScreen() {
   const rows = data?.productos ?? [];
   const total = data?.total ?? 0;
   const errMsg = isError ? (error instanceof Error ? error.message : 'No pudimos cargar los productos.') : null;
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['productos'] });
+    if (almacenId) {
+      await queryClient.invalidateQueries({ queryKey: ['stock', 'almacen', almacenId] });
+    }
+    setRefreshing(false);
+  }, [queryClient, almacenId]);
 
   return (
     <View style={[styles.root, { backgroundColor: c.background, paddingBottom: insets.bottom + 12 }]}>
@@ -114,6 +126,8 @@ export default function ProductosScreen() {
       <ProductCatalogList
         data={rows}
         stockMap={almacenId ? stockMap : undefined}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
     </View>
   );

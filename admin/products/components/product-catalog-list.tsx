@@ -2,16 +2,18 @@ import { Colors } from '@/constants/theme';
 import { formatCurrency, formatNumber } from '@/core/format';
 import type { Producto } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   data: Producto[];
   emptyLabel?: string;
   /** productoId → cantidadDisponible. Undefined = sin almacén seleccionado (no mostrar stock). */
   stockMap?: Record<string, number>;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
-export function ProductCatalogList({ data, emptyLabel = 'No hay resultados.', stockMap }: Props) {
+export function ProductCatalogList({ data, emptyLabel = 'No hay resultados.', stockMap, refreshing, onRefresh }: Props) {
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
 
@@ -20,6 +22,9 @@ export function ProductCatalogList({ data, emptyLabel = 'No hay resultados.', st
       data={data}
       keyExtractor={(item) => item.id}
       contentContainerStyle={{ paddingBottom: 24, gap: 8 }}
+      refreshControl={
+        <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={c.tint} />
+      }
       renderItem={({ item }) => {
         const disponible = stockMap !== undefined ? (stockMap[item.id] ?? 0) : null;
         const sinStock = disponible !== null && disponible === 0;

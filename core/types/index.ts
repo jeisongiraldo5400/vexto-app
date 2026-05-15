@@ -71,7 +71,7 @@ export type CrearClientePayload = {
   tipoDocumento: TipoDocumentoCliente;
   numeroDocumento: string;
   nombre: string;
-  email: string;
+  email?: string;
   apellido?: string;
   razonSocial?: string;
   telefono?: string;

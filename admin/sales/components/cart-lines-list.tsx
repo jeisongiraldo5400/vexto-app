@@ -13,13 +13,14 @@ export type CartLine = {
 type Props = {
   cart: CartLine[];
   onChangeQty: (productoId: string, qty: number) => void;
+  onScanPress?: () => void;
 };
 
 function lineCount(cart: CartLine[]) {
   return cart.reduce((n, l) => n + l.cantidad, 0);
 }
 
-export function CartLinesList({ cart, onChangeQty }: Props) {
+export function CartLinesList({ cart, onChangeQty, onScanPress }: Props) {
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
   const count = lineCount(cart);
@@ -29,20 +30,27 @@ export function CartLinesList({ cart, onChangeQty }: Props) {
     <View style={[styles.panel, { borderColor: c.tint, backgroundColor: c.card }]}>
       <View style={styles.panelHeader}>
         <Text style={[styles.panelTitle, { color: c.text }]}>Carrito</Text>
-        <View style={[styles.badge, { backgroundColor: c.tintMuted }]}>
-          <Text style={[styles.badgeText, { color: c.tint }]}>{count}</Text>
+        <View style={styles.headerActions}>
+          {onScanPress ? (
+            <Pressable onPress={onScanPress} style={[styles.scanBtn, { backgroundColor: c.tint }]}>
+              <Text style={[styles.scanBtnText, { color: c.onPrimary }]}>Escanear</Text>
+            </Pressable>
+          ) : null}
+          <View style={[styles.badge, { backgroundColor: c.tintMuted }]}>
+            <Text style={[styles.badgeText, { color: c.tint }]}>{count}</Text>
+          </View>
         </View>
       </View>
       {empty ? (
         <Text style={[styles.panelHint, { color: c.textSecondary }]}>
-          Aquí verás cada producto al escanear o al elegirlo en la búsqueda.
+          Aquí verás cada producto al escanear.
         </Text>
       ) : null}
 
       {empty ? (
         <View style={[styles.emptyBox, { borderColor: c.border }]}>
           <Text style={[styles.emptyTitle, { color: c.textMuted }]}>Sin productos aún</Text>
-          <Text style={[styles.emptySub, { color: c.textMuted }]}>Escanear arriba · o buscar manualmente</Text>
+          <Text style={[styles.emptySub, { color: c.textMuted }]}>Toca "Escanear" para agregar productos</Text>
         </View>
       ) : (
         <View style={styles.list}>
@@ -118,6 +126,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   panelTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
   badge: {
     minWidth: 28,
@@ -165,4 +174,10 @@ const styles = StyleSheet.create({
   },
   qtyBtnText: { fontSize: 22, fontWeight: '700' },
   qtyVal: { fontSize: 17, fontWeight: '800', minWidth: 24, textAlign: 'center' },
+  scanBtn: {
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  scanBtnText: { fontSize: 13, fontWeight: '700' },
 });

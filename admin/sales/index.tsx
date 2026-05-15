@@ -1,11 +1,9 @@
-import { useProductosQuery } from '@/admin/products/hooks/use-productos-query';
 import { BarcodeScannerModal } from '@/admin/sales/components/barcode-scanner-modal';
 import {
   ClienteVentaSection,
   type ModoClienteVenta,
 } from '@/admin/sales/components/cliente-venta-section';
 import { CartLinesList, type CartLine } from '@/admin/sales/components/cart-lines-list';
-import { ProductSearchPicker } from '@/admin/sales/components/product-search-picker';
 import { QuantityNumpadModal } from '@/admin/sales/components/quantity-numpad-modal';
 import { VentaSuccessModal } from '@/admin/sales/components/venta-success-modal';
 import { WarehousePaymentPicker } from '@/admin/sales/components/warehouse-payment-picker';
@@ -19,12 +17,23 @@ import { primaryGlowShadow, Colors } from '@/constants/theme';
 import { formatCurrency } from '@/core/format';
 import { ApiError } from '@/core/http/api';
 import type { Cliente, Producto, VentaResponse } from '@/core/types';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+function findDefaultMetodoPagoId(metodos: { id: string; nombre: string; codigo: string }[]): string | null {
+  if (metodos.length === 0) return null;
+  // Preferir código '0001' (Efectivo estándar)
+  const porCodigo = metodos.find((m) => m.codigo === '0001');
+  if (porCodigo) return porCodigo.id;
+  // Fallback: nombre que contenga "efectivo" (case-insensitive)
+  const porNombre = metodos.find((m) => m.nombre.toLowerCase().includes('efectivo'));
+  if (porNombre) return porNombre.id;
+  // Fallback final: primer método activo
+  return metodos[0].id;
+}
 
 export default function VentaScreen() {
   const insets = useSafeAreaInsets();
@@ -45,10 +54,17 @@ export default function VentaScreen() {
 
   const [almacenId, setAlmacenId] = useState<string | null>(null);
   const [metodoPagoId, setMetodoPagoId] = useState<string | null>(null);
+  const hasInitializedMeta = useRef(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (hasInitializedMeta.current) return;
     if (almacenes.length === 1) setAlmacenId(almacenes[0].id);
-    if (metodos.length >= 1) setMetodoPagoId(metodos[0].id);
+    if (metodos.length >= 1) {
+      setMetodoPagoId(findDefaultMetodoPagoId(metodos));
+    }
+    if (almacenes.length > 0 || metodos.length > 0) {
+      hasInitializedMeta.current = true;
+    }
   }, [almacenes, metodos]);
 
   const [modoCliente, setModoCliente] = useState<ModoClienteVenta>('ninguno');
@@ -59,6 +75,8 @@ export default function VentaScreen() {
     [metodos, metodoPagoId],
   );
 
+  // Fix crédito: solo forzar modo 'existente' si actualmente es 'ninguno'.
+  // Si el usuario está creando uno nuevo ('nuevo'), no lo interrumpimos.
   useEffect(() => {
     if (esMetodoPagoCredito(metodoSeleccionado?.codigo) && modoCliente === 'ninguno') {
       setModoCliente('existente');
@@ -68,11 +86,6 @@ export default function VentaScreen() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
-
-  const [busqueda, setBusqueda] = useState('');
-  const debouncedBusqueda = useDebouncedValue(busqueda, 350);
-  const productosQ = useProductosQuery(debouncedBusqueda, { minChars: 2 });
-  const resultados = productosQ.data?.productos ?? [];
 
   const [success, setSuccess] = useState<VentaResponse | null>(null);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
@@ -174,6 +187,7 @@ export default function VentaScreen() {
       setCart([]);
       setClienteVenta(null);
       setModoCliente('ninguno');
+      setMetodoPagoId(findDefaultMetodoPagoId(metodos));
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : 'No se pudo registrar la venta.';
       setSubmitErr(msg);
@@ -183,7 +197,7 @@ export default function VentaScreen() {
   function openScanner() {
     setScanFeedback(null);
     if (Platform.OS === 'web') {
-      setScanFeedback('En web no hay cámara. Usa la búsqueda abajo.');
+      setScanFeedback('En web no hay cámara disponible.');
       setScannerOpen(true);
       return;
     }
@@ -207,25 +221,7 @@ export default function VentaScreen() {
         showsVerticalScrollIndicator={false}>
         {metaErr ? <Text style={[styles.warn, { color: c.warning }]}>{metaErr}</Text> : null}
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.scanBtn,
-            { backgroundColor: c.tint, opacity: pressed ? 0.92 : 1 },
-            primaryGlowShadow(),
-          ]}
-          onPress={openScanner}>
-          <Text style={[styles.scanBtnText, { color: c.onPrimary }]}>Escanear código de barras</Text>
-        </Pressable>
-
-        <ProductSearchPicker
-          busqueda={busqueda}
-          onBusquedaChange={setBusqueda}
-          resultados={resultados}
-          loading={productosQ.isFetching}
-          onPick={openQuantityModal}
-        />
-
-        <CartLinesList cart={cart} onChangeQty={setQty} />
+        <CartLinesList cart={cart} onChangeQty={setQty} onScanPress={openScanner} />
 
         <ClienteVentaSection
           modo={modoCliente}
@@ -313,8 +309,6 @@ const styles = StyleSheet.create({
   muted: { fontSize: 16, paddingVertical: 8 },
   warn: { marginBottom: 8, fontSize: 14 },
   sectionMeta: { fontSize: 14, fontWeight: '700', marginTop: 16, marginBottom: 8 },
-  scanBtn: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginBottom: 12 },
-  scanBtnText: { fontSize: 17, fontWeight: '700' },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

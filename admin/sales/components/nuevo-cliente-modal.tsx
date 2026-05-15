@@ -89,11 +89,7 @@ export function NuevoClienteModal ({ visible, tint, onPrimary, onClose, onCreate
     }
 
     const emailTrim = email.trim();
-    if (!emailTrim) {
-      setFormErr('El correo electrónico es obligatorio.');
-      return;
-    }
-    if (!isValidEmail(emailTrim)) {
+    if (emailTrim && !isValidEmail(emailTrim)) {
       setFormErr('Correo inválido.');
       return;
     }
@@ -106,7 +102,7 @@ export function NuevoClienteModal ({ visible, tint, onPrimary, onClose, onCreate
         ...(isNit ? { razonSocial: razonSocial.trim() } : {}),
         ...(!isNit && apellido.trim() ? { apellido: apellido.trim() } : {}),
         ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
-        email: emailTrim,
+        ...(emailTrim ? { email: emailTrim } : {}),
       };
       const cliente = await crear.mutateAsync(payload);
       onCreated(cliente);

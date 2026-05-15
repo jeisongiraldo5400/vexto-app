@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
-import { useCallback, useRef } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const BARCODE_TYPES = [
@@ -35,6 +35,7 @@ export function BarcodeScannerModal({
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const scanLockUntil = useRef(0);
+  const [manualCode, setManualCode] = useState('');
 
   const handleBarcode = useCallback(
     (data: string) => {
@@ -75,7 +76,29 @@ export function BarcodeScannerModal({
           </View>
         ) : (
           <View style={[styles.center, { flex: 1 }]}>
-            <Text style={styles.permText}>El escáner no está disponible en web.</Text>
+            <Text style={[styles.permText, { marginBottom: 12 }]}>
+              El escáner no está disponible en web.{'\n'}Ingresa el código manualmente:
+            </Text>
+            <TextInput
+              style={styles.manualInput}
+              placeholder="Código de barras"
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              value={manualCode}
+              onChangeText={setManualCode}
+              autoFocus
+              onSubmitEditing={() => {
+                handleBarcode(manualCode);
+                setManualCode('');
+              }}
+            />
+            <Pressable
+              style={[styles.btn, { backgroundColor: tint, marginTop: 12 }]}
+              onPress={() => {
+                handleBarcode(manualCode);
+                setManualCode('');
+              }}>
+              <Text style={styles.btnText}>Buscar producto</Text>
+            </Pressable>
           </View>
         )}
         <View style={[styles.overlay, { paddingTop: insets.top + 8 }]}>
@@ -101,9 +124,21 @@ export function BarcodeScannerModal({
 
 const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center', padding: 20 },
-  permText: { color: '#fff', textAlign: 'center' },
+  permText: { color: '#fff', textAlign: 'center', fontSize: 16 },
   btn: { borderRadius: 14, paddingVertical: 16, paddingHorizontal: 24, marginTop: 20 },
   btnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  manualInput: {
+    width: '80%',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    fontSize: 18,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    textAlign: 'center',
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-start',
