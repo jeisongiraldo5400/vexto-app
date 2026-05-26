@@ -20,11 +20,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-function generateId() {
+function generateId () {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export default function ChatVentaScreen() {
+export default function ChatVentaScreen () {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
@@ -346,8 +346,7 @@ export default function ChatVentaScreen() {
                 {[
                   'vendí 8 cervezas a 3500',
                   'se fueron 3 arroz',
-                  'una gaseosa',
-                  '5 papel higiénico',
+                  'registrar venta de 2 hamburguesas a 15000'
                 ].map((ex) => (
                   <Pressable
                     key={ex}
