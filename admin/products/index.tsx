@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Almacen } from '@/core/types';
+import { getAlmacenPredeterminado } from '@/core/utils/almacen';
 
 export default function ProductosScreen() {
   const insets = useSafeAreaInsets();
@@ -39,8 +40,11 @@ export default function ProductosScreen() {
   const [almacenId, setAlmacenId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (almacenes.length === 1 && !almacenId) {
-      setAlmacenId(almacenes[0].id);
+    if (!almacenId && almacenes.length > 0) {
+      const predeterminado = getAlmacenPredeterminado(almacenes);
+      if (predeterminado) {
+        setAlmacenId(predeterminado.id);
+      }
     }
   }, [almacenes, almacenId]);
 
