@@ -23,18 +23,25 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function findDefaultMetodoPagoId(metodos: { id: string; nombre: string; codigo: string }[]): string | null {
   if (metodos.length === 0) return null;
-  // Preferir código '0001' (Efectivo estándar)
   const porCodigo = metodos.find((m) => m.codigo === '0001');
   if (porCodigo) return porCodigo.id;
-  // Fallback: nombre que contenga "efectivo" (case-insensitive)
   const porNombre = metodos.find((m) => m.nombre.toLowerCase().includes('efectivo'));
   if (porNombre) return porNombre.id;
-  // Fallback final: primer método activo
   return metodos[0].id;
 }
 
@@ -82,8 +89,6 @@ export default function VentaScreen() {
     [metodos, metodoPagoId],
   );
 
-  // Fix crédito: solo forzar modo 'existente' si actualmente es 'ninguno'.
-  // Si el usuario está creando uno nuevo ('nuevo'), no lo interrumpimos.
   useEffect(() => {
     if (esMetodoPagoCredito(metodoSeleccionado?.codigo) && modoCliente === 'ninguno') {
       setModoCliente('existente');
@@ -97,8 +102,27 @@ export default function VentaScreen() {
   const [success, setSuccess] = useState<VentaResponse | null>(null);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [qtyModalProduct, setQtyModalProduct] = useState<Producto | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // Stock del producto seleccionado en el almacén elegido
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, (e) => {
+      Keyboard.scheduleLayoutAnimation(e);
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, (e) => {
+      Keyboard.scheduleLayoutAnimation(e);
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   const stockQ = useStockProductoQuery(qtyModalProduct?.id ?? null, almacenId);
   const stockDisponible: number | null = stockQ.isSuccess
     ? stockQ.data.cantidadDisponible
@@ -169,6 +193,9 @@ export default function VentaScreen() {
     [cart],
   );
 
+  const keyboardOpen = keyboardHeight > 0;
+  const footerLift = keyboardOpen ? Math.max(keyboardHeight - insets.bottom, 0) : 0;
+
   async function confirmarVenta() {
     setSubmitErr(null);
     if (!almacenId || !metodoPagoId) {
@@ -222,63 +249,79 @@ export default function VentaScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
-        {metaErr ? <Text style={[styles.warn, { color: c.warning }]}>{metaErr}</Text> : null}
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: c.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.body}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          {metaErr ? <Text style={[styles.warn, { color: c.warning }]}>{metaErr}</Text> : null}
 
-        <CartLinesList cart={cart} onChangeQty={setQty} onScanPress={openScanner} />
+          <CartLinesList cart={cart} onChangeQty={setQty} onScanPress={openScanner} />
 
-        <ClienteVentaSection
-          modo={modoCliente}
-          onModo={setModoCliente}
-          cliente={clienteVenta}
-          onCliente={setClienteVenta}
-          metodoPago={metodoSeleccionado}
-          tint={c.tint}
-          tintMuted={c.tintMuted}
-          onPrimary={c.onPrimary}
-        />
+          <ClienteVentaSection
+            modo={modoCliente}
+            onModo={setModoCliente}
+            cliente={clienteVenta}
+            onCliente={setClienteVenta}
+            metodoPago={metodoSeleccionado}
+            tint={c.tint}
+            tintMuted={c.tintMuted}
+            onPrimary={c.onPrimary}
+          />
 
-        <Text style={[styles.sectionMeta, { color: c.text }]}>Almacén y pago</Text>
-        <WarehousePaymentPicker
-          almacenes={almacenes}
-          metodos={metodos}
-          almacenId={almacenId}
-          metodoPagoId={metodoPagoId}
-          tint={c.tint}
-          tintMuted={c.tintMuted}
-          onAlmacen={setAlmacenId}
-          onMetodo={setMetodoPagoId}
-        />
+          <Text style={[styles.sectionMeta, { color: c.text }]}>Almacén y pago</Text>
+          <WarehousePaymentPicker
+            almacenes={almacenes}
+            metodos={metodos}
+            almacenId={almacenId}
+            metodoPagoId={metodoPagoId}
+            tint={c.tint}
+            tintMuted={c.tintMuted}
+            onAlmacen={setAlmacenId}
+            onMetodo={setMetodoPagoId}
+          />
+        </ScrollView>
 
-        <View style={[styles.totalRow, { borderTopColor: c.border }]}>
-          <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Total aprox.</Text>
-          <Text style={[styles.totalValue, { color: c.text }]}>{formatCurrency(totalEstimado)}</Text>
-        </View>
-
-        {submitErr ? <Text style={[styles.warn, { color: c.error }]}>{submitErr}</Text> : null}
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.confirm,
+        <View
+          style={[
+            styles.footer,
             {
-              backgroundColor: c.tint,
-              opacity: createVenta.isPending ? 0.7 : pressed ? 0.92 : 1,
+              borderTopColor: c.border,
+              backgroundColor: c.background,
+              paddingBottom: insets.bottom + 8,
+              marginBottom: footerLift,
             },
-            primaryGlowShadow(),
-          ]}
-          onPress={() => void confirmarVenta()}
-          disabled={createVenta.isPending}>
-          {createVenta.isPending ? (
-            <ActivityIndicator color={c.onPrimary} />
-          ) : (
-            <Text style={[styles.confirmText, { color: c.onPrimary }]}>Confirmar venta</Text>
-          )}
-        </Pressable>
-      </ScrollView>
+          ]}>
+          <View style={styles.totalRow}>
+            <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Total aprox.</Text>
+            <Text style={[styles.totalValue, { color: c.text }]}>{formatCurrency(totalEstimado)}</Text>
+          </View>
+
+          {submitErr ? <Text style={[styles.warn, { color: c.error }]}>{submitErr}</Text> : null}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.confirm,
+              {
+                backgroundColor: c.tint,
+                opacity: createVenta.isPending ? 0.7 : pressed ? 0.92 : 1,
+              },
+              primaryGlowShadow(),
+            ]}
+            onPress={() => void confirmarVenta()}
+            disabled={createVenta.isPending}>
+            {createVenta.isPending ? (
+              <ActivityIndicator color={c.onPrimary} />
+            ) : (
+              <Text style={[styles.confirmText, { color: c.onPrimary }]}>Registrar venta</Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
 
       <BarcodeScannerModal
         visible={scannerOpen}
@@ -291,7 +334,7 @@ export default function VentaScreen() {
 
       <VentaSuccessModal
         visible={!!success}
-        numeroFactura={success?.numeroFactura ?? ''}
+        venta={success}
         tint={c.tint}
         onPrimary={c.onPrimary}
         onClose={() => setSuccess(null)}
@@ -306,27 +349,32 @@ export default function VentaScreen() {
         }}
         onCancel={() => setQtyModalProduct(null)}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scroll: { paddingHorizontal: 16, paddingTop: 10 },
+  body: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   muted: { fontSize: 16, paddingVertical: 8 },
-  warn: { marginBottom: 8, fontSize: 14 },
+  warn: { marginTop: 8, fontSize: 14 },
   sectionMeta: { fontSize: 14, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    marginBottom: 8,
   },
   totalLabel: { fontSize: 15, fontWeight: '600' },
   totalValue: { fontSize: 22, fontWeight: '800' },
-  confirm: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 14 },
+  confirm: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   confirmText: { fontSize: 17, fontWeight: '700' },
 });
