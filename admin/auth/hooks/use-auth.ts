@@ -3,6 +3,7 @@ import {
   fetchEmpresas,
   loginRequest,
 } from '@/admin/auth/adapters';
+import { authQueryKeys } from '@/admin/auth/hooks/query-keys';
 import * as secureSession from '@/core/session/secure-session';
 import type { AuthUser } from '@/core/types';
 import { useAuthStore } from '@/admin/auth/store/auth-store';
@@ -69,6 +70,7 @@ export function useAuth() {
         needsCompanyPick: false,
       });
       setSession({ user: nextUser, empresaId: eid, needsCompanyPick: false });
+      void queryClient.invalidateQueries({ queryKey: authQueryKeys.empresasUsuario });
       queryClient.invalidateQueries();
       router.replace('/(app)/(tabs)/venta');
     },

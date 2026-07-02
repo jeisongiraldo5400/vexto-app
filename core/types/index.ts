@@ -19,6 +19,7 @@ export type EmpresaDelUsuario = {
   nombre: string;
   nit: string | null;
   activo: boolean;
+  chatVentasHabilitado: boolean;
 };
 
 export type Producto = {
