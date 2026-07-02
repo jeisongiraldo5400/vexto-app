@@ -15,10 +15,13 @@ import { useResolveProductoBarcodeMutation } from '@/admin/sales/hooks/use-resol
 import { useStockProductoQuery } from '@/admin/sales/hooks/use-stock-producto-query';
 import { primaryGlowShadow, Colors } from '@/constants/theme';
 import { formatCurrency } from '@/core/format';
+import { invalidateAfterVenta } from '@/core/query/invalidate-after-venta';
 import { ApiError } from '@/core/http/api';
 import type { Cliente, Producto, VentaResponse } from '@/core/types';
+import { getAlmacenPredeterminado } from '@/core/utils/almacen';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,6 +42,7 @@ export default function VentaScreen() {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
+  const queryClient = useQueryClient();
 
   const almacenesQ = useAlmacenesQuery();
   const metodosQ = useMetodosPagoQuery();
@@ -58,14 +62,17 @@ export default function VentaScreen() {
 
   useLayoutEffect(() => {
     if (hasInitializedMeta.current) return;
-    if (almacenes.length === 1) setAlmacenId(almacenes[0].id);
-    if (metodos.length >= 1) {
+    if (almacenes.length >= 1 && !almacenId) {
+      const predeterminado = getAlmacenPredeterminado(almacenes);
+      if (predeterminado) setAlmacenId(predeterminado.id);
+    }
+    if (metodos.length >= 1 && !metodoPagoId) {
       setMetodoPagoId(findDefaultMetodoPagoId(metodos));
     }
-    if (almacenes.length > 0 || metodos.length > 0) {
+    if ((almacenes.length > 0 && almacenId) || metodos.length > 0) {
       hasInitializedMeta.current = true;
     }
-  }, [almacenes, metodos]);
+  }, [almacenes, metodos, almacenId, metodoPagoId]);
 
   const [modoCliente, setModoCliente] = useState<ModoClienteVenta>('ninguno');
   const [clienteVenta, setClienteVenta] = useState<Cliente | null>(null);
@@ -183,6 +190,7 @@ export default function VentaScreen() {
         items: cart.map((l) => ({ productoId: l.producto.id, cantidad: l.cantidad })),
         ...(clienteVenta ? { clienteId: clienteVenta.id } : {}),
       });
+      invalidateAfterVenta(queryClient);
       setSuccess(v);
       setCart([]);
       setClienteVenta(null);

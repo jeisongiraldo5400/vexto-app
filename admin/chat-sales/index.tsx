@@ -4,9 +4,11 @@ import { useSendChatMessageMutation } from '@/admin/chat-sales/hooks/use-send-ch
 import { useChatStore } from '@/admin/chat-sales/store/chat-store';
 import { Colors } from '@/constants/theme';
 import { ApiError } from '@/core/http/api';
+import { invalidateAfterVenta } from '@/core/query/invalidate-after-venta';
 import type { ChatMessage } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Haptics from 'expo-haptics';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -28,6 +30,7 @@ export default function ChatVentaScreen () {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
+  const queryClient = useQueryClient();
 
   const messages = useChatStore((s) => s.messages);
   const contexto = useChatStore((s) => s.contexto);
@@ -91,6 +94,7 @@ export default function ChatVentaScreen () {
           type: 'success',
           venta: res.venta,
         };
+        invalidateAfterVenta(queryClient);
         setContexto(null);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         // Auto-reset: nueva sesión para próxima venta
@@ -119,7 +123,7 @@ export default function ChatVentaScreen () {
 
       return action;
     },
-    [setContexto, regenerateSessionId],
+    [setContexto, regenerateSessionId, queryClient],
   );
 
   const handleSend = useCallback(

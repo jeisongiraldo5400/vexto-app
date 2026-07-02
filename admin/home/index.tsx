@@ -1,9 +1,10 @@
 import { useDashboardQuery } from '@/admin/home/hooks/use-dashboard-query';
 import type { ProductosMasVendidosData, VentasPorPeriodoData } from '@/admin/home/adapters/home.adapter';
 import { cardElevationShadow, Colors } from '@/constants/theme';
-import { formatCurrency, formatNumber } from '@/core/format';
+import { formatCurrency, formatDateLabel, formatNumber } from '@/core/format';
 import { ApiError } from '@/core/http/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import {
   ActivityIndicator,
@@ -42,7 +43,7 @@ function StatCard({ label, value, accent = false }: StatCardProps) {
 function PeriodoRow({ item }: { item: VentasPorPeriodoData }) {
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
-  const date = item.fecha.slice(0, 10);
+  const date = formatDateLabel(item.fecha);
   return (
     <View style={[styles.listRow, { backgroundColor: c.backgroundPaper, borderColor: c.cardBorder }]}>
       <Text style={[styles.listRowLeft, { color: c.text }]}>{date}</Text>
@@ -87,6 +88,12 @@ export default function InicioScreen() {
 
   const { data, isLoading, isError, error, refetch, isFetching } = useDashboardQuery();
 
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
+
   const onRefresh = useCallback(() => {
     void refetch();
   }, [refetch]);
@@ -94,9 +101,13 @@ export default function InicioScreen() {
   const errMsg = isError
     ? error instanceof ApiError && error.status === 403
       ? 'Sin permiso para ver el dashboard. Solicita el permiso "dashboard:ver" o "reportes:ver".'
-      : error instanceof Error
-        ? error.message
-        : 'No se pudo cargar el resumen.'
+      : error instanceof ApiError && (error.status === 400 || error.status === 500)
+        ? error.message && error.message !== 'Error'
+          ? `No se pudo cargar el resumen. ${error.message}`
+          : 'No se pudo cargar el resumen. Reintenta o contacta al administrador.'
+        : error instanceof Error
+          ? error.message
+          : 'No se pudo cargar el resumen.'
     : null;
 
   if (isLoading) {
