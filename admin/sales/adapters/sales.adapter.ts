@@ -1,11 +1,20 @@
 import { apiFetch } from '@/core/http/api';
 import type { Almacen, MetodoPago, StockInfo, VentaResponse } from '@/core/types';
 
+export type PagoLineaPayload = {
+  metodoPagoId: string;
+  monto: number;
+  montoRecibido?: number;
+  referencia?: string;
+};
+
 export type CrearVentaPayload = {
   almacenId: string;
-  metodoPagoId: string;
+  metodoPagoId?: string;
+  pagos?: PagoLineaPayload[];
   items: { productoId: string; cantidad: number }[];
   clienteId?: string;
+  plazoDias?: number;
 };
 
 export function fetchAlmacenes() {

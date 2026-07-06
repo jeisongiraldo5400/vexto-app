@@ -19,13 +19,14 @@ function useThemeColors() {
 
 type Props = {
   almacenes: Almacen[];
-  metodos: MetodoPago[];
+  metodos?: MetodoPago[];
   almacenId: string | null;
-  metodoPagoId: string | null;
+  metodoPagoId?: string | null;
+  hideMetodo?: boolean;
   tint: string;
   tintMuted: string;
   onAlmacen: (id: string) => void;
-  onMetodo: (id: string) => void;
+  onMetodo?: (id: string) => void;
 };
 
 function SelectorRow({
@@ -126,9 +127,10 @@ function OptionListModal({
 
 export function WarehousePaymentPicker({
   almacenes,
-  metodos,
+  metodos = [],
   almacenId,
-  metodoPagoId,
+  metodoPagoId = null,
+  hideMetodo = false,
   tint,
   tintMuted,
   onAlmacen,
@@ -157,14 +159,14 @@ export function WarehousePaymentPicker({
           </Text>
         ) : null}
 
-        {metodos.length > 1 ? (
+        {metodos.length > 1 && !hideMetodo ? (
           <SelectorRow
             label="Método de pago"
             value={metodoSeleccionado?.nombre ?? 'Seleccionar…'}
             tint={tint}
             onPress={() => setShowMetodo(true)}
           />
-        ) : metodos.length === 1 ? (
+        ) : metodos.length === 1 && !hideMetodo ? (
           <Text style={[styles.singleLine, { color: c.textSecondary }]}>
             Pago: {metodos[0].nombre}
           </Text>
@@ -182,16 +184,18 @@ export function WarehousePaymentPicker({
         onClose={() => setShowAlmacen(false)}
       />
 
-      <OptionListModal
-        visible={showMetodo}
-        title="Seleccionar método de pago"
-        options={metodos.map((m) => ({ id: m.id, label: m.nombre }))}
-        selectedId={metodoPagoId}
-        tint={tint}
-        tintMuted={tintMuted}
-        onSelect={onMetodo}
-        onClose={() => setShowMetodo(false)}
-      />
+      {!hideMetodo ? (
+        <OptionListModal
+          visible={showMetodo}
+          title="Seleccionar método de pago"
+          options={metodos.map((m) => ({ id: m.id, label: m.nombre }))}
+          selectedId={metodoPagoId}
+          tint={tint}
+          tintMuted={tintMuted}
+          onSelect={(id) => onMetodo?.(id)}
+          onClose={() => setShowMetodo(false)}
+        />
+      ) : null}
     </>
   );
 }

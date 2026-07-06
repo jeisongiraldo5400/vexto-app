@@ -1,13 +1,12 @@
-/** Códigos que exigen cliente en la venta (alineado con vexto-frontend POS). */
-const METODOS_PAGO_CREDITO = [
-  'credito',
-  'sistecredito',
-  'addi',
-  'krediya',
-  'celya',
-  'alocredit',
-] as const;
+export const METODO_CREDITO_INTERNO = 'credito';
+
+export function esCreditoInterno(codigo?: string): boolean {
+  return codigo === METODO_CREDITO_INTERNO;
+}
+
+/** Financieras externas — pago inmediato en cobro normal */
+const METODOS_FINANCIERA = ['sistecredito', 'addi', 'krediya', 'celya', 'alocredit'] as const;
 
 export function esMetodoPagoCredito(codigo?: string): boolean {
-  return !!codigo && METODOS_PAGO_CREDITO.includes(codigo as (typeof METODOS_PAGO_CREDITO)[number]);
+  return esCreditoInterno(codigo) || METODOS_FINANCIERA.includes(codigo as (typeof METODOS_FINANCIERA)[number]);
 }

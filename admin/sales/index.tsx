@@ -7,7 +7,13 @@ import { CartLinesList, type CartLine } from '@/admin/sales/components/cart-line
 import { QuantityNumpadModal } from '@/admin/sales/components/quantity-numpad-modal';
 import { VentaSuccessModal } from '@/admin/sales/components/venta-success-modal';
 import { WarehousePaymentPicker } from '@/admin/sales/components/warehouse-payment-picker';
-import { esMetodoPagoCredito } from '@/admin/sales/constants/metodos-pago';
+import {
+  PagosVentaModal,
+  lineasToPayload,
+  type PagoLineaMobile,
+} from '@/admin/sales/components/pagos-venta-modal';
+import { CreditoVentaModal } from '@/admin/sales/components/credito-venta-modal';
+import { useCreateCreditoVentaMutation } from '@/admin/sales/hooks/use-create-credito-venta-mutation';
 import { useAlmacenesQuery } from '@/admin/sales/hooks/use-almacenes-query';
 import { useCreateVentaMutation } from '@/admin/sales/hooks/use-create-venta-mutation';
 import { useMetodosPagoQuery } from '@/admin/sales/hooks/use-metodos-pago-query';
@@ -36,15 +42,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-function findDefaultMetodoPagoId(metodos: { id: string; nombre: string; codigo: string }[]): string | null {
-  if (metodos.length === 0) return null;
-  const porCodigo = metodos.find((m) => m.codigo === '0001');
-  if (porCodigo) return porCodigo.id;
-  const porNombre = metodos.find((m) => m.nombre.toLowerCase().includes('efectivo'));
-  if (porNombre) return porNombre.id;
-  return metodos[0].id;
-}
-
 export default function VentaScreen() {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
@@ -55,6 +52,7 @@ export default function VentaScreen() {
   const metodosQ = useMetodosPagoQuery();
   const resolveBarcode = useResolveProductoBarcodeMutation();
   const createVenta = useCreateVentaMutation();
+  const createCreditoVenta = useCreateCreditoVentaMutation();
 
   const almacenes = useMemo(() => (almacenesQ.data ?? []).filter((x) => x.activo), [almacenesQ.data]);
   const metodos = useMemo(() => {
@@ -64,7 +62,8 @@ export default function VentaScreen() {
   }, [metodosQ.data]);
 
   const [almacenId, setAlmacenId] = useState<string | null>(null);
-  const [metodoPagoId, setMetodoPagoId] = useState<string | null>(null);
+  const [pagosModalOpen, setPagosModalOpen] = useState(false);
+  const [creditoModalOpen, setCreditoModalOpen] = useState(false);
   const hasInitializedMeta = useRef(false);
 
   useLayoutEffect(() => {
@@ -73,27 +72,13 @@ export default function VentaScreen() {
       const predeterminado = getAlmacenPredeterminado(almacenes);
       if (predeterminado) setAlmacenId(predeterminado.id);
     }
-    if (metodos.length >= 1 && !metodoPagoId) {
-      setMetodoPagoId(findDefaultMetodoPagoId(metodos));
-    }
-    if ((almacenes.length > 0 && almacenId) || metodos.length > 0) {
+    if (almacenes.length > 0 && almacenId) {
       hasInitializedMeta.current = true;
     }
-  }, [almacenes, metodos, almacenId, metodoPagoId]);
+  }, [almacenes, almacenId]);
 
   const [modoCliente, setModoCliente] = useState<ModoClienteVenta>('ninguno');
   const [clienteVenta, setClienteVenta] = useState<Cliente | null>(null);
-
-  const metodoSeleccionado = useMemo(
-    () => metodos.find((m) => m.id === metodoPagoId) ?? null,
-    [metodos, metodoPagoId],
-  );
-
-  useEffect(() => {
-    if (esMetodoPagoCredito(metodoSeleccionado?.codigo) && modoCliente === 'ninguno') {
-      setModoCliente('existente');
-    }
-  }, [metodoSeleccionado?.codigo, modoCliente]);
 
   const [cart, setCart] = useState<CartLine[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -196,24 +181,43 @@ export default function VentaScreen() {
   const keyboardOpen = keyboardHeight > 0;
   const footerLift = keyboardOpen ? Math.max(keyboardHeight - insets.bottom, 0) : 0;
 
-  async function confirmarVenta() {
+  function abrirCobro() {
     setSubmitErr(null);
-    if (!almacenId || !metodoPagoId) {
-      setSubmitErr('Elige almacén y método de pago.');
+    if (!almacenId) {
+      setSubmitErr('Elige un almacén.');
       return;
     }
     if (cart.length === 0) {
       setSubmitErr('Agrega al menos un producto al carrito.');
       return;
     }
-    if (esMetodoPagoCredito(metodoSeleccionado?.codigo) && !clienteVenta) {
-      setSubmitErr('Selecciona o crea un cliente para ventas a crédito.');
+    setPagosModalOpen(true);
+  }
+
+  function abrirCredito() {
+    setSubmitErr(null);
+    if (!almacenId) {
+      setSubmitErr('Elige un almacén.');
       return;
     }
+    if (cart.length === 0) {
+      setSubmitErr('Agrega al menos un producto al carrito.');
+      return;
+    }
+    setCreditoModalOpen(true);
+  }
+
+  async function confirmarVentaConPagos(lineas: PagoLineaMobile[]) {
+    setSubmitErr(null);
+    if (!almacenId) return;
+
+    const pagos = lineasToPayload(lineas);
+
     try {
       const v = await createVenta.mutateAsync({
         almacenId,
-        metodoPagoId,
+        pagos,
+        metodoPagoId: pagos[0]?.metodoPagoId,
         items: cart.map((l) => ({ productoId: l.producto.id, cantidad: l.cantidad })),
         ...(clienteVenta ? { clienteId: clienteVenta.id } : {}),
       });
@@ -222,9 +226,44 @@ export default function VentaScreen() {
       setCart([]);
       setClienteVenta(null);
       setModoCliente('ninguno');
-      setMetodoPagoId(findDefaultMetodoPagoId(metodos));
+      setPagosModalOpen(false);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : 'No se pudo registrar la venta.';
+      setSubmitErr(msg);
+    }
+  }
+
+  async function confirmarVentaCredito(params: {
+    clienteId: string;
+    cuotaInicial: number;
+    numeroCuotas: number;
+    frecuenciaDias: number;
+  }) {
+    setSubmitErr(null);
+    if (!almacenId) return;
+
+    try {
+      const result = await createCreditoVenta.mutateAsync({
+        almacenId,
+        clienteId: params.clienteId,
+        items: cart.map((l) => ({ productoId: l.producto.id, cantidad: l.cantidad })),
+        cuotaInicial: params.cuotaInicial,
+        numeroCuotas: params.numeroCuotas,
+        frecuenciaDias: params.frecuenciaDias,
+      });
+      invalidateAfterVenta(queryClient);
+      setSuccess({
+        id: result.ventaId,
+        numeroFactura: result.numeroFactura,
+        total: result.total,
+        estado: 'pendiente',
+      } as VentaResponse);
+      setCart([]);
+      setClienteVenta(null);
+      setModoCliente('ninguno');
+      setCreditoModalOpen(false);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'No se pudo registrar la venta a crédito.';
       setSubmitErr(msg);
     }
   }
@@ -267,22 +306,20 @@ export default function VentaScreen() {
             onModo={setModoCliente}
             cliente={clienteVenta}
             onCliente={setClienteVenta}
-            metodoPago={metodoSeleccionado}
+            metodoPago={null}
             tint={c.tint}
             tintMuted={c.tintMuted}
             onPrimary={c.onPrimary}
           />
 
-          <Text style={[styles.sectionMeta, { color: c.text }]}>Almacén y pago</Text>
+          <Text style={[styles.sectionMeta, { color: c.text }]}>Almacén</Text>
           <WarehousePaymentPicker
             almacenes={almacenes}
-            metodos={metodos}
             almacenId={almacenId}
-            metodoPagoId={metodoPagoId}
+            hideMetodo
             tint={c.tint}
             tintMuted={c.tintMuted}
             onAlmacen={setAlmacenId}
-            onMetodo={setMetodoPagoId}
           />
         </ScrollView>
 
@@ -312,16 +349,55 @@ export default function VentaScreen() {
               },
               primaryGlowShadow(),
             ]}
-            onPress={() => void confirmarVenta()}
-            disabled={createVenta.isPending}>
+            onPress={() => void abrirCobro()}
+            disabled={createVenta.isPending || createCreditoVenta.isPending}>
             {createVenta.isPending ? (
               <ActivityIndicator color={c.onPrimary} />
             ) : (
-              <Text style={[styles.confirmText, { color: c.onPrimary }]}>Registrar venta</Text>
+              <Text style={[styles.confirmText, { color: c.onPrimary }]}>Cobrar venta</Text>
             )}
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.creditoBtn,
+              {
+                borderColor: c.tint,
+                opacity: createCreditoVenta.isPending ? 0.7 : pressed ? 0.92 : 1,
+              },
+            ]}
+            onPress={() => void abrirCredito()}
+            disabled={createVenta.isPending || createCreditoVenta.isPending}>
+            <Text style={[styles.creditoBtnText, { color: c.tint }]}>Vender a crédito</Text>
           </Pressable>
         </View>
       </View>
+
+      <PagosVentaModal
+        visible={pagosModalOpen}
+        metodos={metodos}
+        totalVenta={totalEstimado}
+        almacenId={almacenId}
+        almacenes={almacenes}
+        initialAlmacenId={almacenId}
+        onAlmacenChange={setAlmacenId}
+        onConfirm={(lineas) => void confirmarVentaConPagos(lineas)}
+        onClose={() => setPagosModalOpen(false)}
+        tint={c.tint}
+        onPrimary={c.onPrimary}
+      />
+
+      <CreditoVentaModal
+        visible={creditoModalOpen}
+        cart={cart}
+        almacenId={almacenId}
+        totalVenta={totalEstimado}
+        onConfirm={(p) => void confirmarVentaCredito(p)}
+        onClose={() => setCreditoModalOpen(false)}
+        tint={c.tint}
+        onPrimary={c.onPrimary}
+        loading={createCreditoVenta.isPending}
+      />
 
       <BarcodeScannerModal
         visible={scannerOpen}
@@ -377,4 +453,12 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 22, fontWeight: '800' },
   confirm: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   confirmText: { fontSize: 17, fontWeight: '700' },
+  creditoBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+    borderWidth: 1.5,
+  },
+  creditoBtnText: { fontSize: 16, fontWeight: '700' },
 });
