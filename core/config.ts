@@ -69,14 +69,22 @@ function inferDevApiBaseUrl(): string {
 export function getApiBaseUrl(): string {
   const fromEnv = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim();
   if (fromEnv) {
-    return normalizeBaseUrl(fromEnv);
+    const normalized = normalizeBaseUrl(fromEnv);
+    if (!__DEV__ && !normalized.startsWith('https://')) {
+      throw new Error('La URL del API debe usar HTTPS en producción.');
+    }
+    return normalized;
   }
 
   const fromExtra = (
     (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl ?? ''
   ).trim();
   if (fromExtra) {
-    return normalizeBaseUrl(fromExtra);
+    const normalized = normalizeBaseUrl(fromExtra);
+    if (!__DEV__ && !normalized.startsWith('https://')) {
+      throw new Error('La URL del API debe usar HTTPS en producción.');
+    }
+    return normalized;
   }
 
   if (__DEV__) {

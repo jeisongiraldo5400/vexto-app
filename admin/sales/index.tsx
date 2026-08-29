@@ -255,9 +255,9 @@ export default function VentaScreen() {
       setSuccess({
         id: result.ventaId,
         numeroFactura: result.numeroFactura,
+        items: [],
         total: result.total,
-        estado: 'pendiente',
-      } as VentaResponse);
+      });
       setCart([]);
       setClienteVenta(null);
       setModoCliente('ninguno');

@@ -21,7 +21,7 @@
       "bundleIdentifier": "com.jeison5400.vextoapp"
     },
     "android": {
-      "usesCleartextTraffic": true,
+      "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/logo/vexto.png",
@@ -31,8 +31,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ],
       "package": "com.jeison5400.vextoapp"
     },

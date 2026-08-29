@@ -32,6 +32,7 @@ export type ThemeColors = {
   card: string;
   cardBorder: string;
   error: string;
+  success: string;
   warning: string;
   onPrimary: string;
   /** Chips / selección suave sobre el tint */
@@ -56,6 +57,7 @@ export const Colors: Record<'light' | 'dark', ThemeColors> = {
     card: '#ffffff',
     cardBorder: 'rgba(15, 23, 42, 0.08)',
     error: '#dc2626',
+    success: '#16a34a',
     warning: '#d97706',
     onPrimary: '#ffffff',
     tintMuted: 'rgba(26, 95, 63, 0.12)',
@@ -77,6 +79,7 @@ export const Colors: Record<'light' | 'dark', ThemeColors> = {
     card: '#1e293b',
     cardBorder: 'rgba(248, 250, 252, 0.1)',
     error: '#f87171',
+    success: '#4ade80',
     warning: '#fbbf24',
     onPrimary: '#0f172a',
     tintMuted: 'rgba(132, 204, 22, 0.18)',
