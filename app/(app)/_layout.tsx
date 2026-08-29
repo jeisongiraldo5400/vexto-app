@@ -26,6 +26,7 @@ export default function AppGroupLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="reparacion/[id]" options={{ headerShown: true, title: 'Reparación' }} />
     </Stack>
   );
 }

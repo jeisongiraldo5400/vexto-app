@@ -47,6 +47,9 @@ export default function TabLayout() {
 
   const chatHabilitado =
     empresasQ.data?.find((e) => e.id === empresaId)?.chatVentasHabilitado ?? false;
+  const reparacionesHabilitado =
+    empresasQ.data?.find((e) => e.id === empresaId)?.modulosHabilitados?.includes('reparaciones') ??
+    false;
 
   return (
     <Tabs
@@ -87,6 +90,15 @@ export default function TabLayout() {
           title: 'Productos',
           headerTitle: 'Productos',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cube.box.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="reparaciones"
+        options={{
+          title: 'Reparaciones',
+          headerTitle: 'Mis reparaciones',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="wrench.fill" color={color} />,
+          href: reparacionesHabilitado ? undefined : null,
         }}
       />
       <Tabs.Screen

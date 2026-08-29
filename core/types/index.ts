@@ -6,6 +6,8 @@ export type AuthUser = {
   empresaId?: string;
   permisos?: string[];
   rol?: { id: string; codigo: string; nombre: string };
+  modulosHabilitados?: string[];
+  sucursalIds?: string[];
 };
 
 export type AuthResponse = {
@@ -20,6 +22,7 @@ export type EmpresaDelUsuario = {
   nit: string | null;
   activo: boolean;
   chatVentasHabilitado: boolean;
+  modulosHabilitados?: string[];
 };
 
 export type Producto = {
