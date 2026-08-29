@@ -1,6 +1,6 @@
 import { useDashboardQuery } from '@/admin/home/hooks/use-dashboard-query';
 import type { ProductosMasVendidosData, VentasPorPeriodoData } from '@/admin/home/adapters/home.adapter';
-import { cardElevationShadow, Colors } from '@/constants/theme';
+import { cardElevationShadow, Colors, Radius, Spacing, TouchTarget } from '@/constants/theme';
 import { formatCurrency, formatDateLabel, formatNumber } from '@/core/format';
 import { ApiError } from '@/core/http/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -15,6 +15,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/admin/auth/hooks/use-auth';
+import { type Href, useRouter } from 'expo-router';
+import { Pressable } from 'react-native';
 
 type StatCardProps = {
   label: string;
@@ -85,8 +88,12 @@ export default function InicioScreen() {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
+  const router = useRouter();
+  const { user } = useAuth();
+  const reportesHabilitado = user?.modulosHabilitados?.includes('reportes') ?? false;
+  const reparacionesHabilitado = user?.modulosHabilitados?.includes('reparaciones') ?? false;
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useDashboardQuery();
+  const { data, isLoading, isError, error, refetch, isFetching } = useDashboardQuery(reportesHabilitado);
 
   useFocusEffect(
     useCallback(() => {
@@ -109,6 +116,30 @@ export default function InicioScreen() {
           ? error.message
           : 'No se pudo cargar el resumen.'
     : null;
+
+  if (!reportesHabilitado) {
+    return (
+      <ScrollView style={{ backgroundColor: c.background }} contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 110, gap: Spacing.md }}>
+        <Text style={{ color: c.textSecondary, fontSize: 14 }}>Bienvenido de nuevo</Text>
+        <Text style={{ color: c.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.8 }}>{user?.fullName || 'Vexto'}</Text>
+        <View style={{ backgroundColor: c.tint, borderRadius: Radius.xl, padding: Spacing.xl, marginTop: Spacing.sm }}>
+          <Text style={{ color: c.onPrimary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase' }}>Acción rápida</Text>
+          <Text style={{ color: c.onPrimary, fontSize: 22, fontWeight: '800', marginTop: 6 }}>Continúa con tu operación</Text>
+          <Text style={{ color: c.onPrimary, opacity: 0.8, marginTop: 6 }}>Accede a las herramientas habilitadas para tu empresa.</Text>
+        </View>
+        {reparacionesHabilitado ? (
+          <Pressable onPress={() => router.push('/(app)/(tabs)/reparaciones' as Href)} style={({ pressed }) => ({ minHeight: TouchTarget, padding: Spacing.lg, borderRadius: Radius.lg, backgroundColor: pressed ? c.tintMuted : c.card, borderColor: c.cardBorder, borderWidth: 1 })}>
+            <Text style={{ color: c.text, fontSize: 17, fontWeight: '700' }}>Mis reparaciones</Text>
+            <Text style={{ color: c.textSecondary, marginTop: 4 }}>Consulta órdenes asignadas y actualiza su progreso.</Text>
+          </Pressable>
+        ) : null}
+        <Pressable onPress={() => router.push('/(app)/(tabs)/venta' as Href)} style={({ pressed }) => ({ minHeight: TouchTarget, padding: Spacing.lg, borderRadius: Radius.lg, backgroundColor: pressed ? c.tintMuted : c.card, borderColor: c.cardBorder, borderWidth: 1 })}>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '700' }}>Nueva venta</Text>
+          <Text style={{ color: c.textSecondary, marginTop: 4 }}>Escanea productos y registra una venta rápidamente.</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -190,7 +221,7 @@ export default function InicioScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, paddingTop: 16 },
+  scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 110 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 24 },
   loadingText: { fontSize: 16, marginTop: 8 },
   errText: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
@@ -199,7 +230,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   statCard: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     paddingVertical: 16,
     paddingHorizontal: 14,

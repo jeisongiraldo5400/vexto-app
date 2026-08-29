@@ -1,8 +1,7 @@
 import { useAuth } from '@/admin/auth/hooks/use-auth';
-import { useEmpresasUsuarioQuery } from '@/admin/auth/hooks/use-empresas-usuario-query';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Radius, TouchTarget } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Tabs } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
@@ -42,14 +41,10 @@ function HeaderTitleVenta() {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const c = Colors[colorScheme ?? 'light'];
-  const { empresaId } = useAuth();
-  const empresasQ = useEmpresasUsuarioQuery();
+  const { user } = useAuth();
 
-  const chatHabilitado =
-    empresasQ.data?.find((e) => e.id === empresaId)?.chatVentasHabilitado ?? false;
   const reparacionesHabilitado =
-    empresasQ.data?.find((e) => e.id === empresaId)?.modulosHabilitados?.includes('reparaciones') ??
-    false;
+    user?.modulosHabilitados?.includes('reparaciones') ?? false;
 
   return (
     <Tabs
@@ -58,8 +53,22 @@ export default function TabLayout() {
         tabBarInactiveTintColor: c.tabIconDefault,
         tabBarStyle: {
           backgroundColor: c.backgroundPaper,
-          borderTopColor: c.border,
+          borderTopColor: c.borderSubtle,
+          height: 68,
+          paddingTop: 7,
+          paddingBottom: 8,
+          marginHorizontal: 12,
+          marginBottom: 8,
+          borderRadius: Radius.xl,
+          position: 'absolute',
+          shadowColor: '#000',
+          shadowOpacity: 0.1,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 8,
         },
+        tabBarItemStyle: { minHeight: TouchTarget, borderRadius: Radius.lg },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         headerShown: true,
         headerStyle: { backgroundColor: c.backgroundPaper },
         headerTintColor: c.text,
@@ -90,6 +99,7 @@ export default function TabLayout() {
           title: 'Productos',
           headerTitle: 'Productos',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cube.box.fill" color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -107,7 +117,15 @@ export default function TabLayout() {
           title: 'Chat',
           headerTitle: 'Venta por Chat',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="bubble.left.and.bubble.right" color={color} />,
-          href: chatHabilitado ? undefined : null,
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="mas"
+        options={{
+          title: 'Más',
+          headerTitle: 'Más opciones',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="square.grid.2x2.fill" color={color} />,
         }}
       />
     </Tabs>

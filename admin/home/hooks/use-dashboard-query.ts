@@ -4,12 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import { homeQueryKeys } from './query-keys';
 
-export function useDashboardQuery() {
+export function useDashboardQuery(moduleEnabled = true) {
   const enabled = useSessionQueryEnabled();
   return useQuery({
     queryKey: homeQueryKeys.dashboard,
     queryFn: fetchDashboard,
-    enabled,
+    enabled: enabled && moduleEnabled,
     staleTime: 60_000,
     retry: 1,
   });

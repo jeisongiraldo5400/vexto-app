@@ -1,7 +1,7 @@
 import { BarcodeScannerModal } from '@/admin/sales/components/barcode-scanner-modal';
 import { fetchRepairs } from '@/admin/repairs/adapters';
 import { useRepairsQuery } from '@/admin/repairs/hooks';
-import { Colors } from '@/constants/theme';
+import { Colors, Radius, Spacing, TouchTarget, cardElevationShadow } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -37,18 +37,21 @@ export function RepairsListScreen() {
   if (q.isLoading) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
-      <Text style={{ fontSize: 22, fontWeight: '700', color: c.text }}>Mis reparaciones</Text>
+    <ScrollView style={{ backgroundColor: c.background }} contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 110, gap: Spacing.md }}>
+      <View>
+        <Text style={{ fontSize: 26, fontWeight: '800', letterSpacing: -0.7, color: c.text }}>Mis reparaciones</Text>
+        <Text style={{ color: c.textSecondary, marginTop: 4 }}>Órdenes asignadas y pendientes de atención.</Text>
+      </View>
       <TextInput
         value={search}
         onChangeText={setSearch}
         placeholder="Buscar por número"
         placeholderTextColor={c.textSecondary}
-        style={{ borderWidth: 1, borderColor: c.cardBorder, borderRadius: 8, padding: 10, color: c.text }}
+        style={{ minHeight: TouchTarget, borderWidth: 1, borderColor: c.inputBorder, backgroundColor: c.inputBackground, borderRadius: Radius.md, paddingHorizontal: 14, color: c.text }}
       />
       <Pressable
         onPress={() => setScannerOpen(true)}
-        style={{ borderWidth: 1, borderColor: c.tint, padding: 10, borderRadius: 8 }}
+        style={{ minHeight: TouchTarget, justifyContent: 'center', borderWidth: 1, borderColor: c.tint, paddingHorizontal: 14, borderRadius: Radius.md }}
       >
         <Text style={{ color: c.tint, textAlign: 'center', fontWeight: '600' }}>Escanear IMEI / orden</Text>
       </Pressable>
@@ -59,7 +62,7 @@ export function RepairsListScreen() {
         <Pressable
           key={item.id}
           onPress={() => router.push(`/(app)/reparacion/${item.id}` as Href)}
-          style={{ backgroundColor: c.card, borderColor: c.cardBorder, borderWidth: 1, borderRadius: 12, padding: 14 }}
+          style={({ pressed }) => ([cardElevationShadow(), { minHeight: TouchTarget, backgroundColor: pressed ? c.tintMuted : c.card, borderColor: c.cardBorder, borderWidth: 1, borderRadius: Radius.lg, padding: Spacing.lg }])}
         >
           <Text style={{ fontWeight: '700', color: c.text }}>{item.orderNumber}</Text>
           <Text style={{ color: c.textSecondary, marginTop: 4 }}>{LABEL[item.status] ?? item.status} · {item.priority}</Text>

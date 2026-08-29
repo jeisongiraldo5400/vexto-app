@@ -15,6 +15,11 @@ export const Brand = {
   secondaryDark: '#65a30d',
 } as const;
 
+export const Radius = { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 } as const;
+export const Spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
+export const TouchTarget = 44;
+export const Motion = { fast: 140, normal: 220, slow: 320 } as const;
+
 export type ThemeColors = {
   text: string;
   textSecondary: string;
@@ -44,7 +49,7 @@ export const Colors: Record<'light' | 'dark', ThemeColors> = {
     text: '#0f172a',
     textSecondary: '#64748b',
     textMuted: '#94a3b8',
-    background: '#f1f5f9',
+    background: '#f5f7f9',
     backgroundPaper: '#ffffff',
     tint: Brand.primary,
     tabIconDefault: '#64748b',
@@ -110,8 +115,8 @@ export function cardElevationShadow(): ViewStyle {
     ios: {
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.08,
-      shadowRadius: 24,
+      shadowOpacity: 0.06,
+      shadowRadius: 20,
     },
     android: { elevation: 4 },
     default: {},
