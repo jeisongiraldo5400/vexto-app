@@ -1,7 +1,7 @@
 import { addRepairNote, addRepairPhoto, changeRepairStatus } from '@/admin/repairs/adapters';
 import { RepairPhotoModal } from '@/admin/repairs/repair-photo-modal';
 import { useRepairDetailQuery } from '@/admin/repairs/hooks';
-import { Colors } from '@/constants/theme';
+import { Brand, Colors, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
@@ -37,11 +37,54 @@ export function RepairDetailScreen() {
   };
 
   const next = NEXT[String(order.status)] ?? [];
+  const status = String(order.status);
+  const steps = [
+    { key: 'RECEIVED', label: 'Recibido' },
+    { key: 'DIAGNOSING', label: 'Diagnóstico' },
+    { key: 'IN_REPAIR', label: 'Reparación' },
+    { key: 'READY_FOR_PICKUP', label: 'Listo' },
+  ] as const;
+  const stepRank: Record<string, number> = {
+    RECEIVED: 0,
+    PENDING_DIAGNOSIS: 1,
+    DIAGNOSING: 1,
+    WAITING_CUSTOMER_APPROVAL: 1,
+    APPROVED: 2,
+    WAITING_PART: 2,
+    READY_FOR_REPAIR: 2,
+    IN_REPAIR: 2,
+    QUALITY_CONTROL: 3,
+    READY_FOR_PICKUP: 3,
+    DELIVERED: 3,
+  };
+  const currentRank = stepRank[status] ?? 0;
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 22, fontWeight: '700', color: c.text }}>{String(order.orderNumber)}</Text>
-      <Text style={{ color: c.textSecondary }}>{String(order.status)} · {String(order.priority)}</Text>
+      <Text style={{ color: c.textSecondary }}>{status} · {String(order.priority)}</Text>
+      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+        {steps.map((step, index) => {
+          const done = currentRank >= index;
+          return (
+            <View
+              key={step.key}
+              style={{
+                backgroundColor: done ? Brand.primary : c.card,
+                borderColor: done ? Brand.primary : c.cardBorder,
+                borderWidth: 1,
+                borderRadius: Radius.pill,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+              }}
+            >
+              <Text style={{ color: done ? '#ffffff' : c.textSecondary, fontWeight: '700', fontSize: 12 }}>
+                {step.label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
       <Text style={{ color: c.text }}>{String(order.reportedIssue ?? '')}</Text>
       <TextInput
         value={note}

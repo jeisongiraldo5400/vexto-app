@@ -40,7 +40,6 @@ export type ThemeColors = {
   success: string;
   warning: string;
   onPrimary: string;
-  /** Chips / selección suave sobre el tint */
   tintMuted: string;
 };
 
@@ -91,7 +90,6 @@ export const Colors: Record<'light' | 'dark', ThemeColors> = {
   },
 };
 
-/** Degradado del panel web (`AuthLayout`) */
 export const BrandGradient = {
   hero: [Brand.primaryDark, Brand.primary, Brand.primaryLight] as const,
   logo: [Brand.primary, Brand.primaryLight] as const,

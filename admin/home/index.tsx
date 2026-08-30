@@ -173,6 +173,18 @@ export default function InicioScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={c.tint} />}>
 
+      <Text style={{ color: c.textSecondary, fontSize: 14 }}>
+        {(() => {
+          const hour = new Date().getHours();
+          if (hour < 12) return 'Buenos días';
+          if (hour < 19) return 'Buenas tardes';
+          return 'Buenas noches';
+        })()}
+      </Text>
+      <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.6, marginBottom: 4 }}>
+        {user?.fullName?.trim().split(/\s+/)[0] || 'Vexto'}
+      </Text>
+
       {/* Stat cards — fila 1 */}
       <Text style={[styles.sectionTitle, { color: c.text }]}>Ventas</Text>
       <View style={styles.statRow}>
