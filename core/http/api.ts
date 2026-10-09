@@ -1,5 +1,5 @@
 import * as secureSession from '@/core/session/secure-session';
-import type { AuthResponse, AuthUser, EmpresaDelUsuario } from '@/core/types';
+import type { AuthResponse, EmpresaDelUsuario } from '@/core/types';
 
 import { ApiError } from './api-error';
 import { authedAxios, normalizeApiPath, publicAxios } from './axios-instance';
@@ -14,6 +14,10 @@ export async function loginRequest(email: string, password: string): Promise<Aut
   } catch (e) {
     throw toApiError(e);
   }
+}
+
+export async function logoutRequest(accessToken: string): Promise<void> {
+  await publicAxios.post('auth/logout', {}, { headers: { Authorization: `Bearer ${accessToken}` } });
 }
 
 export async function refreshTokens(refreshToken: string): Promise<AuthResponse> {
@@ -52,6 +56,7 @@ export async function cambiarEmpresaRequest(accessToken: string, empresaId: stri
 type ApiFetchInit = {
   method?: string;
   body?: unknown;
+  headers?: Record<string, string>;
   /** No enviar X-Company-Id (rutas /auth que solo usan JWT). */
   skipCompanyHeader?: boolean;
 };
@@ -80,6 +85,7 @@ export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promis
       method,
       data: init.body !== undefined ? parseBody(init.body) : undefined,
       skipCompanyHeader: init.skipCompanyHeader,
+      headers: init.headers,
     });
 
     if (res.status === 204) {

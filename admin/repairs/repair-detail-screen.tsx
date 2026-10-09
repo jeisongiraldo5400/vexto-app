@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/admin/auth/store/auth-store';
 import { addRepairNote, addRepairPhoto, changeRepairStatus } from '@/admin/repairs/adapters';
 import { RepairPhotoModal } from '@/admin/repairs/repair-photo-modal';
 import { useRepairDetailQuery } from '@/admin/repairs/hooks';
@@ -5,8 +6,8 @@ import { Brand, Colors, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 const NEXT: Record<string, string[]> = {
   RECEIVED: ['PENDING_DIAGNOSIS'],
@@ -25,15 +26,26 @@ export function RepairDetailScreen() {
   const c = Colors[scheme ?? 'light'];
   const q = useRepairDetailQuery(id);
   const qc = useQueryClient();
+  const user = useAuthStore(s => s.user);
+  const permisos = user?.permisos ?? [];
+  const canEdit = permisos.includes('reparaciones:editar');
+  const canDiagnose = permisos.includes('reparaciones:diagnosticar');
+  const pending = useRef(false);
+  const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const order = q.data;
 
-  if (q.isLoading || !order) return <ActivityIndicator style={{ marginTop: 40 }} />;
+  if (q.isError) return <View style={{padding:16}}><Text style={{color:c.error}}>{q.error.message}</Text><Pressable onPress={() => void q.refetch()}><Text style={{color:c.tint}}>Reintentar</Text></Pressable></View>;
+  if (q.isLoading) return <ActivityIndicator style={{ marginTop: 40 }} />;
+  if (!order) return <Text style={{padding:16,color:c.text}}>Orden no encontrada</Text>;
 
   const run = async (fn: () => Promise<unknown>) => {
-    await fn();
-    await qc.invalidateQueries({ queryKey: ['reparaciones'] });
+    if (pending.current) return;
+    pending.current = true; setBusy(true);
+    try { await fn(); await qc.invalidateQueries({ queryKey: ['reparaciones'] }); }
+    catch(error) { Alert.alert('No se pudo completar la operación', error instanceof Error ? error.message : 'Intenta nuevamente'); }
+    finally { pending.current = false; setBusy(false); }
   };
 
   const next = NEXT[String(order.status)] ?? [];
@@ -86,7 +98,7 @@ export function RepairDetailScreen() {
         })}
       </View>
       <Text style={{ color: c.text }}>{String(order.reportedIssue ?? '')}</Text>
-      <TextInput
+      {canDiagnose && <><TextInput
         value={note}
         onChangeText={setNote}
         placeholder="Nota / diagnóstico"
@@ -94,22 +106,25 @@ export function RepairDetailScreen() {
         style={{ borderWidth: 1, borderColor: c.cardBorder, borderRadius: 8, padding: 10, color: c.text }}
       />
       <Pressable
-        onPress={() => run(() => addRepairNote(id, note))}
+        disabled={busy || !note.trim()}
+        onPress={() => void run(() => addRepairNote(id, note))}
         style={{ backgroundColor: c.tint, padding: 12, borderRadius: 8 }}
       >
         <Text style={{ color: c.onPrimary, textAlign: 'center', fontWeight: '600' }}>Agregar nota</Text>
-      </Pressable>
-      <Pressable
+      </Pressable></>}
+      {canEdit && <Pressable
+        disabled={busy}
         onPress={() => setCameraOpen(true)}
         style={{ borderWidth: 1, borderColor: c.tint, padding: 12, borderRadius: 8 }}
       >
         <Text style={{ color: c.tint, textAlign: 'center', fontWeight: '600' }}>Foto de evidencia</Text>
-      </Pressable>
+      </Pressable>}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {next.map((s) => (
+        {canEdit && next.map((s) => (
           <Pressable
             key={s}
-            onPress={() => run(() => changeRepairStatus(id, s))}
+            disabled={busy}
+            onPress={() => void run(() => changeRepairStatus(id, s))}
             style={{ borderWidth: 1, borderColor: c.tint, padding: 8, borderRadius: 8 }}
           >
             <Text style={{ color: c.tint }}>{s}</Text>
@@ -117,7 +132,7 @@ export function RepairDetailScreen() {
         ))}
       </View>
       <RepairPhotoModal
-        visible={cameraOpen}
+        visible={cameraOpen && canEdit}
         tint={c.tint}
         onClose={() => setCameraOpen(false)}
         onCapture={(photo) => {

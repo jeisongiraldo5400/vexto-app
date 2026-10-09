@@ -37,6 +37,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
   const scheme = useColorScheme();
   const c = Colors[scheme ?? 'light'];
   const [digits, setDigits] = useState('0');
+  const productId = product?.id;
 
   const maxQty =
     stockDisponible !== null
@@ -44,7 +45,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
       : ABSOLUTE_MAX_QTY;
 
   useEffect(() => {
-    if (visible && product) {
+    if (visible && productId) {
       setDigits('0');
       if (Platform.OS === 'ios') {
         void AccessibilityInfo.announceForAccessibility(
@@ -52,7 +53,7 @@ export function QuantityNumpadModal({ visible, product, stockDisponible, onConfi
         );
       }
     }
-  }, [visible, product?.id]);
+  }, [visible, productId]);
 
   const pushDigit = useCallback(
     (d: string) => {

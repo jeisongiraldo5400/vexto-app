@@ -83,7 +83,7 @@ export function validarPagosLineasMobile(
 
 export function lineasToPayload(
   lineas: PagoLineaMobile[],
-): Array<{ metodoPagoId: string; monto: number; montoRecibido?: number }> {
+): { metodoPagoId: string; monto: number; montoRecibido?: number }[] {
   return lineas.map((l) => {
     const monto = parseFloat(l.monto) || 0;
     const rec = parseFloat(l.montoRecibido);

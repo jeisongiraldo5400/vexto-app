@@ -44,7 +44,7 @@ export default function TabLayout() {
   const { user } = useAuth();
 
   const reparacionesHabilitado =
-    user?.modulosHabilitados?.includes('reparaciones') ?? false;
+    !!user?.modulosHabilitados?.includes('reparaciones') && !!user?.permisos?.includes('reparaciones:ver');
 
   return (
     <Tabs
@@ -87,6 +87,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="venta"
         options={{
+          href: user?.modulosHabilitados?.includes('pos') && (user?.permisos?.includes('ventas:crear') || user?.permisos?.includes('pos:crear')) ? undefined : null,
           title: 'Venta',
           tabBarLabel: 'Venta',
           headerTitle: () => <HeaderTitleVenta />,

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { isAxiosError } from 'axios';
 
 import { ApiError } from './api-error';
 
@@ -24,7 +24,7 @@ export function parseErrorMessage(data: unknown): string {
 
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
-  if (axios.isAxiosError(error)) {
+  if (isAxiosError(error)) {
     const status = error.response?.status ?? 0;
     const msg =
       parseErrorMessage(error.response?.data) ||

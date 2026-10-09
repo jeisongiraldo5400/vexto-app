@@ -34,6 +34,7 @@ export function RepairsListScreen() {
       )
     : items;
 
+  if (q.isError) return <View style={{padding:16}}><Text style={{color:c.error}}>{q.error.message}</Text><Pressable onPress={() => void q.refetch()}><Text style={{color:c.tint}}>Reintentar</Text></Pressable></View>;
   if (q.isLoading) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
   return (

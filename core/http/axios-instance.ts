@@ -1,4 +1,6 @@
-import axios, {
+import {
+  create as createAxios,
+  isAxiosError,
   AxiosError,
   AxiosHeaders,
   type AxiosInstance,
@@ -24,14 +26,16 @@ function attachResolvedApiBaseURL(client: AxiosInstance) {
   });
 }
 
-export const publicAxios = axios.create({
+export const publicAxios = createAxios({
+  timeout: 30000,
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   },
 });
 
-export const authedAxios = axios.create({
+export const authedAxios = createAxios({
+  timeout: 30000,
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -55,6 +59,41 @@ authedAxios.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Todas las respuestas 401 comparten una única rotación del refresh token.
+let refreshInFlight: Promise<void> | null = null;
+
+async function refreshSession(): Promise<void> {
+  const session = await secureSession.loadSession();
+  if (!session) throw new ApiError(401, 'Sesión expirada');
+
+  try {
+    const { data: refreshed } = await publicAxios.post<AuthResponse>('auth/refresh', {
+      refreshToken: session.refreshToken,
+    });
+    const current = await secureSession.loadSession();
+    // Un logout, login o cambio de empresa puede ocurrir mientras llega la respuesta.
+    if (current?.refreshToken !== session.refreshToken) return;
+    await secureSession.saveSession({
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken,
+      empresaId: refreshed.user.empresaId ?? session.empresaId,
+      user: refreshed.user as AuthUser,
+      needsCompanyPick: session.needsCompanyPick,
+    });
+    await authHttpBridge.syncFromStorage();
+  } catch (error) {
+    const current = await secureSession.loadSession();
+    if (current?.refreshToken !== session.refreshToken) return;
+    // Un fallo de red o del servidor permite reintentar sin borrar la sesión.
+    if (isAxiosError(error) && [400, 401, 403].includes(error.response?.status ?? 0)) {
+      await secureSession.clearSession();
+      authHttpBridge.clearLocal();
+      throw new ApiError(401, 'Sesión expirada');
+    }
+    throw toApiError(error);
+  }
+}
+
 authedAxios.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
@@ -66,29 +105,17 @@ authedAxios.interceptors.response.use(
     original._retry401 = true;
     const session = await secureSession.loadSession();
     if (!session) {
-      await secureSession.clearSession();
       authHttpBridge.clearLocal();
-      return Promise.reject(new ApiError(401, 'Sesión expirada'));
+      throw new ApiError(401, 'Sesión expirada');
     }
-
-    try {
-      const { data: refreshed } = await publicAxios.post<AuthResponse>('auth/refresh', {
-        refreshToken: session.refreshToken,
-      });
-      const empresaId = refreshed.user.empresaId ?? session.empresaId;
-      await secureSession.saveSession({
-        accessToken: refreshed.accessToken,
-        refreshToken: refreshed.refreshToken,
-        empresaId,
-        user: refreshed.user as AuthUser,
-        needsCompanyPick: false,
-      });
-      await authHttpBridge.syncFromStorage();
-      return authedAxios.request(original);
-    } catch {
-      await secureSession.clearSession();
-      authHttpBridge.clearLocal();
-      return Promise.reject(new ApiError(401, 'Sesión expirada'));
+    const sentToken = AxiosHeaders.from(original.headers).get('Authorization');
+    // Un 401 tardío puede pertenecer al token anterior a una renovación completada.
+    if (sentToken === `Bearer ${session.accessToken}`) {
+      if (!refreshInFlight) {
+        refreshInFlight = refreshSession().finally(() => { refreshInFlight = null; });
+      }
+      await refreshInFlight;
     }
+    return authedAxios.request(original);
   },
 );

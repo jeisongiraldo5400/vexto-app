@@ -6,7 +6,6 @@ import {
   validarPagosLineasMobile,
   type PagoLineaMobile,
 } from '@/admin/sales/components/pagos-multi-select-section';
-import { formatCurrency } from '@/core/format';
 import type { MetodoPago } from '@/core/types';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';

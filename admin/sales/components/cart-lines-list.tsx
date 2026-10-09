@@ -50,7 +50,7 @@ export function CartLinesList({ cart, onChangeQty, onScanPress }: Props) {
       {empty ? (
         <View style={[styles.emptyBox, { borderColor: c.border }]}>
           <Text style={[styles.emptyTitle, { color: c.textMuted }]}>Sin productos aún</Text>
-          <Text style={[styles.emptySub, { color: c.textMuted }]}>Toca "Escanear" para agregar productos</Text>
+          <Text style={[styles.emptySub, { color: c.textMuted }]}>Toca &quot;Escanear&quot; para agregar productos</Text>
         </View>
       ) : (
         <View style={styles.list}>

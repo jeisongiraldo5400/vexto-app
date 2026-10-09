@@ -1,3 +1,4 @@
+import * as secureSession from '@/core/session/secure-session';
 import { apiFetch } from '@/core/http/api';
 import type { Almacen, MetodoPago, StockInfo, VentaResponse } from '@/core/types';
 
@@ -59,6 +60,16 @@ export async function fetchStockAlmacenAll(almacenId: string, busqueda = '') {
   return all;
 }
 
-export function crearVenta(body: CrearVentaPayload) {
-  return apiFetch<VentaResponse>('/ventas', { method: 'POST', body });
+const pendingSales = new Map<string, string>();
+export async function crearVenta(body: CrearVentaPayload) {
+  const session = await secureSession.loadSession();
+  const fingerprint = JSON.stringify([session?.user.id, session?.empresaId, body]);
+  let key = pendingSales.get(fingerprint);
+  if (!key) {
+    key = `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    pendingSales.set(fingerprint, key);
+  }
+  const result = await apiFetch<VentaResponse>('/ventas', { method: 'POST', body, headers: { 'Idempotency-Key': key } });
+  pendingSales.delete(fingerprint);
+  return result;
 }

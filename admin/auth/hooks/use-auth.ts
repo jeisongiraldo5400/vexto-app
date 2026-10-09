@@ -1,9 +1,11 @@
+import { logoutRequest } from '@/core/http/api';
+import { useChatStore } from '@/admin/chat-sales/store/chat-store';
+import { Alert } from 'react-native';
 import {
   cambiarEmpresaRequest,
   fetchEmpresas,
   loginRequest,
 } from '@/admin/auth/adapters';
-import { authQueryKeys } from '@/admin/auth/hooks/query-keys';
 import * as secureSession from '@/core/session/secure-session';
 import type { AuthUser } from '@/core/types';
 import { useAuthStore } from '@/admin/auth/store/auth-store';
@@ -49,7 +51,7 @@ export function useAuth() {
       if (multi) {
         router.replace('/(auth)/select-empresa');
       } else {
-        router.replace('/(app)/(tabs)/venta');
+        router.replace('/(app)/(tabs)/inicio');
       }
     },
     [router, setSession],
@@ -62,6 +64,9 @@ export function useAuth() {
       const auth = await cambiarEmpresaRequest(s.accessToken, nextEmpresaId);
       const nextUser = auth.user as AuthUser;
       const eid = nextUser.empresaId ?? nextEmpresaId;
+      await queryClient.cancelQueries();
+      queryClient.removeQueries();
+      useChatStore.getState().clearChat();
       await secureSession.saveSession({
         accessToken: auth.accessToken,
         refreshToken: auth.refreshToken,
@@ -70,18 +75,24 @@ export function useAuth() {
         needsCompanyPick: false,
       });
       setSession({ user: nextUser, empresaId: eid, needsCompanyPick: false });
-      void queryClient.invalidateQueries({ queryKey: authQueryKeys.empresasUsuario });
-      queryClient.invalidateQueries();
-      router.replace('/(app)/(tabs)/venta');
+      router.replace('/(app)/(tabs)/inicio');
     },
     [router, setSession, queryClient],
   );
 
   const signOut = useCallback(async () => {
+    const session = await secureSession.loadSession();
+    let failed = false;
+    try {
+      if (session) await logoutRequest(session.accessToken);
+    } catch { failed = true; }
+    await queryClient.cancelQueries();
     await secureSession.clearSession();
+    useChatStore.getState().clearChat();
     clearLocal();
     queryClient.removeQueries();
     router.replace('/(auth)/login');
+    if (failed) Alert.alert('Sesión cerrada en este dispositivo', 'No se pudo revocar la sesión en el servidor. Revisa la conexión.');
   }, [router, clearLocal, queryClient]);
 
   return useMemo(

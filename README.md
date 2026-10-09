@@ -1,50 +1,53 @@
-# Welcome to your Expo app 👋
+# Vexto — app móvil
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App Expo 54 / React Native para consulta de productos, inventario, ventas,
+reparaciones y chat de ventas. Usa Expo Router, React Query y Zustand.
 
-## Get started
+## Desarrollo
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Requiere Node.js 22 y npm 10. Se mantiene únicamente `package-lock.json`.
 
 ```bash
-npm run reset-project
+npm ci
+cp .env.example .env.local
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Configurar `EXPO_PUBLIC_API_BASE_URL` con la URL de la API, incluido `/v1/api`.
+En un dispositivo físico, usar una dirección accesible desde la red del teléfono.
+Para iniciar plataformas específicas: `npm run android` o `npm run ios`.
 
-## Learn more
+La sesión se guarda con Expo SecureStore. Las respuestas 401 comparten una sola
+renovación; un 401 tardío reintenta con el token actualizado. Los fallos de red
+no borran la sesión y una respuesta tardía no restaura una sesión cerrada.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Verificaciones
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm run typecheck
+npm run lint
+npm test
+```
 
-## Join the community
+Las pruebas de Vitest cubren la coordinación del cliente HTTP sin emulador ni
+llamadas externas. La validación de cámara, SecureStore nativo y navegación
+requiere un dispositivo o emulador.
 
-Join our community of developers creating universal apps.
+El workflow `.github/workflows/ci.yml` ejecuta tipos, lint y pruebas. Las builds
+nativas se gestionan con la configuración existente de `eas.json`.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Sesiones y reintentos
+
+Al cambiar empresa se cancelan consultas, se elimina la caché anterior, se limpia
+el chat y se remontan pantallas para descartar el carrito local. Reparaciones usa
+claves por empresa. Rutas y pestañas respetan módulos/permisos. Logout intenta
+revocar en el servidor y elimina credenciales locales; si falla la conexión,
+informa que la revocación remota no pudo confirmarse. Las peticiones tienen un
+timeout de 30 segundos. Una venta reintentada conserva su clave de idempotencia
+hasta confirmar éxito, dentro del proceso de la app.
+
+La actualización compatible redujo `npm audit` de 54 a 43 avisos y eliminó los
+2 críticos. Ver `DEPENDENCIAS-PENDIENTES.md`: no todos los avisos tienen un parche
+compatible publicado para esta combinación de Expo/React Native. No usar
+`npm audit fix --force` como sustituto de una migración de SDK validada.
