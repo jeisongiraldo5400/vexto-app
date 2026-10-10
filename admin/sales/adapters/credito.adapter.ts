@@ -1,4 +1,5 @@
-import { apiFetch } from '@/core/http/api';
+import { postIdempotent } from "@/core/http/idempotent";
+import { apiFetch } from "@/core/http/api";
 
 export type CrearVentaCreditoPagoLinea = {
   metodoPagoId: string;
@@ -27,11 +28,13 @@ export type CrearVentaCreditoResponse = {
 };
 
 export function crearVentaCredito(body: CrearVentaCreditoPayload) {
-  return apiFetch<CrearVentaCreditoResponse>('/creditos/ventas', { method: 'POST', body });
+  return postIdempotent<CrearVentaCreditoResponse>("/creditos/ventas", body);
 }
 
 export function fetchDeudaCliente(clienteId: string) {
-  return apiFetch<{ clienteId: string; deuda: number }>(`/creditos/cliente/${clienteId}/deuda`);
+  return apiFetch<{ clienteId: string; deuda: number }>(
+    `/creditos/cliente/${clienteId}/deuda`,
+  );
 }
 
 export function previewCuotas(
@@ -45,7 +48,11 @@ export function previewCuotas(
   const hoy = new Date();
 
   if (cuotaInicial > 0) {
-    out.push({ numero: 0, monto: cuotaInicial, fecha: hoy.toISOString().slice(0, 10) });
+    out.push({
+      numero: 0,
+      monto: cuotaInicial,
+      fecha: hoy.toISOString().slice(0, 10),
+    });
   }
 
   if (saldo > 0 && numeroCuotas > 0) {
@@ -54,7 +61,8 @@ export function previewCuotas(
     for (let i = 1; i <= numeroCuotas; i++) {
       const d = new Date(hoy);
       d.setDate(d.getDate() + frecuenciaDias * i);
-      const monto = i === numeroCuotas ? Math.round((saldo - acc) * 100) / 100 : base;
+      const monto =
+        i === numeroCuotas ? Math.round((saldo - acc) * 100) / 100 : base;
       acc += monto;
       out.push({ numero: i, monto, fecha: d.toISOString().slice(0, 10) });
     }

@@ -1,4 +1,5 @@
-import { apiFetch } from '@/core/http/api';
+import { apiFetch } from "@/core/http/api";
+import { postIdempotent } from "@/core/http/idempotent";
 
 export type RepairOrder = {
   id: string;
@@ -7,34 +8,125 @@ export type RepairOrder = {
   priority: string;
   reportedIssue: string | null;
 };
-
-export async function fetchMyRepairs() {
-  return apiFetch<{ items: RepairOrder[]; total: number }>('reparaciones/mias');
+export type RepairDetail = RepairOrder & {
+  customerId: string;
+  deviceId: string;
+  technicianId: string | null;
+  trackingToken?: string;
+  cliente?: { nombre: string; telefono?: string };
+  equipo?: { imei?: string; serial_number?: string };
+  diagnosticos?: { id: string; technical_diagnosis?: string }[];
+  cotizaciones?: {
+    id: string;
+    status: string;
+    total: string;
+    discount?: string;
+    tax?: string;
+    items?: {
+      type?: string;
+      description: string;
+      quantity: string;
+      unit_price: string;
+    }[];
+  }[];
+  partes?: { id: string; status: string; quantity: string }[];
+  qa?: { id: string; passed: boolean; notes?: string }[];
+  pagos?: { id: string; monto: string; estado: string; fecha_pago: string }[];
+  saldo?: { total: number | null; pagado: number; pendiente: number | null };
+  garantias?: {
+    id: string;
+    coverage: string;
+    expires_at: string;
+    reclamos?: { id: string; status: string; reason: string }[];
+  }[];
+  fotos?: { id: string; visibility: string }[];
+  checklist?: { label: string; result: string; notes?: string }[];
+  timeline?: { id: string; title: string; created_at: string }[];
+};
+export type RepairResources = {
+  clientes: { id: string; nombre: string; numero_documento: string }[];
+  equipos: {
+    id: string;
+    customer_id: string;
+    imei?: string;
+    serial_number?: string;
+  }[];
+  tipos: { id: string; nombre: string }[];
+  tecnicos: { id: string; nombre: string }[];
+  productos: { id: string; nombre: string }[];
+  almacenes: { id: string; nombre: string }[];
+  metodos: { id: string; nombre: string }[];
+};
+export function fetchRepairs(busqueda = "", pagina = 1, mine = false) {
+  const q = new URLSearchParams({
+    busqueda,
+    pagina: String(pagina),
+    limite: "50",
+  });
+  return apiFetch<{ items: RepairOrder[]; total: number }>(
+    `reparaciones${mine ? "/mias" : ""}?${q}`,
+  );
 }
-
-export async function fetchRepairs(busqueda?: string) {
-  const q = busqueda ? `&busqueda=${encodeURIComponent(busqueda)}` : '';
-  return apiFetch<{ items: RepairOrder[]; total: number }>(`reparaciones?limite=50${q}`);
+export function fetchMyRepairs() {
+  return fetchRepairs("", 1, true);
 }
-
-export async function fetchRepairDetail(id: string) {
-  return apiFetch<Record<string, unknown>>(`reparaciones/${id}`);
+export function fetchRepairDetail(id: string) {
+  return apiFetch<RepairDetail>(`reparaciones/${id}`);
 }
-
-export async function changeRepairStatus(id: string, status: string) {
-  return apiFetch(`reparaciones/${id}/estado`, { method: 'PUT', body: { status } });
+export function fetchRepairResources() {
+  return apiFetch<RepairResources>("reparaciones/catalogos/operacion");
 }
-
-export async function addRepairNote(id: string, technicalDiagnosis: string) {
+export function changeRepairStatus(id: string, status: string) {
+  return apiFetch(`reparaciones/${id}/estado`, {
+    method: "PUT",
+    body: { status },
+  });
+}
+export function addRepairNote(
+  id: string,
+  technicalDiagnosis: string,
+  publicSummary?: string,
+) {
   return apiFetch(`reparaciones/${id}/diagnosticos`, {
-    method: 'POST',
-    body: { technicalDiagnosis, foundIssue: technicalDiagnosis },
+    method: "POST",
+    body: { technicalDiagnosis, foundIssue: technicalDiagnosis, publicSummary },
   });
 }
-
-export async function addRepairPhoto(id: string, storageKey: string, url?: string) {
-  return apiFetch(`reparaciones/${id}/adjuntos`, {
-    method: 'POST',
-    body: { type: 'REPAIR_PHOTO', storageKey, url, visibility: 'INTERNAL' },
+export function addRepairPhoto(
+  id: string,
+  base64: string,
+  visibility = "INTERNAL",
+) {
+  return apiFetch(`reparaciones/${id}/fotos`, {
+    method: "POST",
+    body: { base64, mime: "image/jpeg", visibility },
   });
+}
+export function repairAction(
+  id: string,
+  action: string,
+  body: unknown = {},
+  method = "POST",
+) {
+  const path = `reparaciones/${id}/${action}`;
+  return action === "pagos"
+    ? postIdempotent(path, body)
+    : apiFetch(path, { method, body });
+}
+export function estimateAction(id: string, action: string) {
+  return apiFetch(`reparaciones/cotizaciones/${id}/${action}`, {
+    method: "POST",
+    body: {},
+  });
+}
+export function partAction(id: string, action: string) {
+  return apiFetch(`reparaciones/repuestos/${id}/${action}`, {
+    method: "POST",
+    body: {},
+  });
+}
+export function readRepairPhoto(id: string, photo: string) {
+  return apiFetch<{ mime: string; base64: string }>(
+    `reparaciones/${id}/fotos/${photo}`,
+  );
 }

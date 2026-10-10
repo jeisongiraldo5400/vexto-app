@@ -1,73 +1,195 @@
-import { BarcodeScannerModal } from '@/admin/sales/components/barcode-scanner-modal';
-import { fetchRepairs } from '@/admin/repairs/adapters';
-import { useRepairsQuery } from '@/admin/repairs/hooks';
-import { Colors, Radius, Spacing, TouchTarget, cardElevationShadow } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { canAccess } from "@/core/permissions";
+import { useAuthStore } from "@/admin/auth/store/auth-store";
+import { BarcodeScannerModal } from "@/admin/sales/components/barcode-scanner-modal";
+import { fetchRepairs } from "@/admin/repairs/adapters";
+import { useRepairsQuery } from "@/admin/repairs/hooks";
+import {
+  Colors,
+  Radius,
+  Spacing,
+  TouchTarget,
+  cardElevationShadow,
+} from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { type Href, useRouter } from "expo-router";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 const LABEL: Record<string, string> = {
-  RECEIVED: 'Recibida',
-  PENDING_DIAGNOSIS: 'Pendiente diagnóstico',
-  DIAGNOSING: 'Diagnosticando',
-  IN_REPAIR: 'En reparación',
-  WAITING_PART: 'Esperando repuesto',
-  QUALITY_CONTROL: 'QA',
-  READY_FOR_PICKUP: 'Lista',
-  DELIVERED: 'Entregada',
-  URGENT: 'Urgente',
+  RECEIVED: "Recibida",
+  PENDING_DIAGNOSIS: "Pendiente diagnóstico",
+  DIAGNOSING: "Diagnosticando",
+  IN_REPAIR: "En reparación",
+  WAITING_PART: "Esperando repuesto",
+  QUALITY_CONTROL: "QA",
+  READY_FOR_PICKUP: "Lista",
+  DELIVERED: "Entregada",
+  URGENT: "Urgente",
 };
 
 export function RepairsListScreen() {
   const scheme = useColorScheme();
-  const c = Colors[scheme ?? 'light'];
+  const c = Colors[scheme ?? "light"];
   const router = useRouter();
-  const q = useRepairsQuery(true);
+  const user = useAuthStore((s) => s.user);
+  const [mine, setMine] = useState(true);
+  const [page, setPage] = useState(1);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
+  const q = useRepairsQuery(mine, page, search);
+  const [matches, setMatches] = useState<{ id: string; orderNumber: string }[]>(
+    [],
+  );
   const items = q.data?.items ?? [];
-  const filtered = search
-    ? items.filter((item) =>
-        `${item.orderNumber} ${item.reportedIssue ?? ''}`.toLowerCase().includes(search.toLowerCase()),
-      )
-    : items;
+  const filtered = items;
 
-  if (q.isError) return <View style={{padding:16}}><Text style={{color:c.error}}>{q.error.message}</Text><Pressable onPress={() => void q.refetch()}><Text style={{color:c.tint}}>Reintentar</Text></Pressable></View>;
+  if (q.isError)
+    return (
+      <View style={{ padding: 16 }}>
+        <Text style={{ color: c.error }}>{q.error.message}</Text>
+        <Pressable onPress={() => void q.refetch()}>
+          <Text style={{ color: c.tint }}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
   if (q.isLoading) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
   return (
-    <ScrollView style={{ backgroundColor: c.background }} contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 110, gap: Spacing.md }}>
+    <ScrollView
+      style={{ backgroundColor: c.background }}
+      contentContainerStyle={{
+        padding: Spacing.lg,
+        paddingBottom: 110,
+        gap: Spacing.md,
+      }}
+    >
       <View>
-        <Text style={{ fontSize: 26, fontWeight: '800', letterSpacing: -0.7, color: c.text }}>Mis reparaciones</Text>
-        <Text style={{ color: c.textSecondary, marginTop: 4 }}>Órdenes asignadas y pendientes de atención.</Text>
+        <Text
+          style={{
+            fontSize: 26,
+            fontWeight: "800",
+            letterSpacing: -0.7,
+            color: c.text,
+          }}
+        >
+          Mis reparaciones
+        </Text>
+        <Text style={{ color: c.textSecondary, marginTop: 4 }}>
+          Órdenes asignadas y pendientes de atención.
+        </Text>
       </View>
+      {canAccess(user, "reparaciones", "reparaciones:crear") && (
+        <Pressable
+          onPress={() => router.push("/(app)/reparacion/nueva" as Href)}
+        >
+          <Text style={{ color: c.tint }}>Recibir equipo</Text>
+        </Pressable>
+      )}
+      {canAccess(user, "reparaciones", "reparaciones:ver-todas") && (
+        <Pressable
+          onPress={() => {
+            setMine(!mine);
+            setPage(1);
+          }}
+        >
+          <Text style={{ color: c.tint }}>
+            {mine ? "Ver todas las órdenes" : "Ver mis órdenes"}
+          </Text>
+        </Pressable>
+      )}
       <TextInput
         value={search}
-        onChangeText={setSearch}
+        onChangeText={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
         placeholder="Buscar por número"
         placeholderTextColor={c.textSecondary}
-        style={{ minHeight: TouchTarget, borderWidth: 1, borderColor: c.inputBorder, backgroundColor: c.inputBackground, borderRadius: Radius.md, paddingHorizontal: 14, color: c.text }}
+        style={{
+          minHeight: TouchTarget,
+          borderWidth: 1,
+          borderColor: c.inputBorder,
+          backgroundColor: c.inputBackground,
+          borderRadius: Radius.md,
+          paddingHorizontal: 14,
+          color: c.text,
+        }}
       />
       <Pressable
         onPress={() => setScannerOpen(true)}
-        style={{ minHeight: TouchTarget, justifyContent: 'center', borderWidth: 1, borderColor: c.tint, paddingHorizontal: 14, borderRadius: Radius.md }}
+        style={{
+          minHeight: TouchTarget,
+          justifyContent: "center",
+          borderWidth: 1,
+          borderColor: c.tint,
+          paddingHorizontal: 14,
+          borderRadius: Radius.md,
+        }}
       >
-        <Text style={{ color: c.tint, textAlign: 'center', fontWeight: '600' }}>Escanear IMEI / orden</Text>
+        <Text style={{ color: c.tint, textAlign: "center", fontWeight: "600" }}>
+          Escanear IMEI / orden
+        </Text>
       </Pressable>
       {filtered.length === 0 ? (
-        <Text style={{ color: c.textSecondary }}>No tienes órdenes asignadas.</Text>
+        <Text style={{ color: c.textSecondary }}>
+          No tienes órdenes asignadas.
+        </Text>
       ) : null}
       {filtered.map((item) => (
         <Pressable
           key={item.id}
           onPress={() => router.push(`/(app)/reparacion/${item.id}` as Href)}
-          style={({ pressed }) => ([cardElevationShadow(), { minHeight: TouchTarget, backgroundColor: pressed ? c.tintMuted : c.card, borderColor: c.cardBorder, borderWidth: 1, borderRadius: Radius.lg, padding: Spacing.lg }])}
+          style={({ pressed }) => [
+            cardElevationShadow(),
+            {
+              minHeight: TouchTarget,
+              backgroundColor: pressed ? c.tintMuted : c.card,
+              borderColor: c.cardBorder,
+              borderWidth: 1,
+              borderRadius: Radius.lg,
+              padding: Spacing.lg,
+            },
+          ]}
         >
-          <Text style={{ fontWeight: '700', color: c.text }}>{item.orderNumber}</Text>
-          <Text style={{ color: c.textSecondary, marginTop: 4 }}>{LABEL[item.status] ?? item.status} · {item.priority}</Text>
-          <Text style={{ color: c.text, marginTop: 6 }}>{item.reportedIssue ?? 'Sin problema reportado'}</Text>
+          <Text style={{ fontWeight: "700", color: c.text }}>
+            {item.orderNumber}
+          </Text>
+          <Text style={{ color: c.textSecondary, marginTop: 4 }}>
+            {LABEL[item.status] ?? item.status} · {item.priority}
+          </Text>
+          <Text style={{ color: c.text, marginTop: 6 }}>
+            {item.reportedIssue ?? "Sin problema reportado"}
+          </Text>
+        </Pressable>
+      ))}
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Pressable disabled={page === 1} onPress={() => setPage(page - 1)}>
+          <Text style={{ color: c.tint }}>Anterior</Text>
+        </Pressable>
+        <Text style={{ color: c.text }}>
+          {page} · {q.data?.total ?? 0} órdenes
+        </Text>
+        <Pressable
+          disabled={page * 50 >= (q.data?.total ?? 0)}
+          onPress={() => setPage(page + 1)}
+        >
+          <Text style={{ color: c.tint }}>Siguiente</Text>
+        </Pressable>
+      </View>
+      {matches.map((m) => (
+        <Pressable
+          key={m.id}
+          onPress={() => router.push(`/(app)/reparacion/${m.id}` as Href)}
+        >
+          <Text style={{ color: c.tint }}>Abrir {m.orderNumber}</Text>
         </Pressable>
       ))}
       <BarcodeScannerModal
@@ -78,14 +200,22 @@ export function RepairsListScreen() {
         onClearFeedback={() => setFeedback(null)}
         onCode={async (code) => {
           setSearch(code);
-          const remote = await fetchRepairs(code).catch(() => null);
+          const remote = await fetchRepairs(code, 1, mine).catch(() => {
+            setFeedback("No se pudo consultar. Revisa la conexión o permisos.");
+            return null;
+          });
+          if (remote && remote.items.length > 1) {
+            setMatches(remote.items);
+            setScannerOpen(false);
+            return;
+          }
           const match = remote?.items?.[0];
           if (match) {
             setScannerOpen(false);
             router.push(`/(app)/reparacion/${match.id}` as Href);
             return;
           }
-          setFeedback('No se encontró una orden con ese código');
+          setFeedback("No se encontró una orden con ese código");
         }}
       />
     </ScrollView>
