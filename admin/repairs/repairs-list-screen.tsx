@@ -11,6 +11,7 @@ import {
   cardElevationShadow,
 } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { type Href, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -44,24 +45,16 @@ export function RepairsListScreen() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const q = useRepairsQuery(mine, page, search);
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const q = useRepairsQuery(mine, page, debouncedSearch);
   const [matches, setMatches] = useState<{ id: string; orderNumber: string }[]>(
     [],
   );
   const items = q.data?.items ?? [];
   const filtered = items;
 
-  if (q.isError)
-    return (
-      <View style={{ padding: 16 }}>
-        <Text style={{ color: c.error }}>{q.error.message}</Text>
-        <Pressable onPress={() => void q.refetch()}>
-          <Text style={{ color: c.tint }}>Reintentar</Text>
-        </Pressable>
-      </View>
-    );
-  if (q.isLoading) return <ActivityIndicator style={{ marginTop: 40 }} />;
-
+  // Carga y error se muestran dentro de la lista: el buscador no se desmonta
+  // y conserva el foco mientras se escribe.
   return (
     <ScrollView
       style={{ backgroundColor: c.background }}
@@ -138,7 +131,16 @@ export function RepairsListScreen() {
           Escanear IMEI / orden
         </Text>
       </Pressable>
-      {filtered.length === 0 ? (
+      {q.isError ? (
+        <View>
+          <Text style={{ color: c.error }}>{q.error.message}</Text>
+          <Pressable onPress={() => void q.refetch()}>
+            <Text style={{ color: c.tint }}>Reintentar</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {q.isFetching ? <ActivityIndicator style={{ marginVertical: 8 }} /> : null}
+      {!q.isLoading && !q.isError && filtered.length === 0 ? (
         <Text style={{ color: c.textSecondary }}>
           No tienes órdenes asignadas.
         </Text>
@@ -204,7 +206,9 @@ export function RepairsListScreen() {
             setFeedback("No se pudo consultar. Revisa la conexión o permisos.");
             return null;
           });
-          if (remote && remote.items.length > 1) {
+          // El error de red ya se informó: no lo tapes con "no encontrada".
+          if (!remote) return;
+          if (remote.items.length > 1) {
             setMatches(remote.items);
             setScannerOpen(false);
             return;

@@ -2,6 +2,7 @@ import { useAuth } from '@/admin/auth/hooks/use-auth';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Radius, TouchTarget } from '@/constants/theme';
+import { canOpenPath } from '@/core/permissions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Tabs } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
@@ -43,8 +44,8 @@ export default function TabLayout() {
   const c = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
 
-  const reparacionesHabilitado =
-    !!user?.modulosHabilitados?.includes('reparaciones') && !!user?.permisos?.includes('reparaciones:ver');
+  const ventaHabilitada = canOpenPath(user, '/venta');
+  const reparacionesHabilitado = canOpenPath(user, '/reparaciones');
 
   return (
     <Tabs
@@ -87,7 +88,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="venta"
         options={{
-          href: user?.modulosHabilitados?.includes('pos') && (user?.permisos?.includes('ventas:crear') || user?.permisos?.includes('pos:crear')) ? undefined : null,
+          href: ventaHabilitada ? undefined : null,
           title: 'Venta',
           tabBarLabel: 'Venta',
           headerTitle: () => <HeaderTitleVenta />,

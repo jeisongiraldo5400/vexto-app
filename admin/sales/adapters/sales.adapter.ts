@@ -82,6 +82,6 @@ export async function fetchStockAlmacenAll(almacenId: string, busqueda = "") {
   return all;
 }
 
-export function crearVenta(body: CrearVentaPayload) {
-  return postIdempotent<VentaResponse>("/ventas", body);
+export function crearVenta(body: CrearVentaPayload, intent?: string) {
+  return postIdempotent<VentaResponse>("/ventas", body, intent);
 }

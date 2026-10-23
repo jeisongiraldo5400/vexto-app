@@ -5,6 +5,7 @@ import {
 } from '@/admin/sales/components/cliente-venta-section';
 import { CartLinesList, type CartLine } from '@/admin/sales/components/cart-lines-list';
 import { QuantityNumpadModal } from '@/admin/sales/components/quantity-numpad-modal';
+import { VentaFooter } from '@/admin/sales/components/venta-footer';
 import { VentaSuccessModal } from '@/admin/sales/components/venta-success-modal';
 import { WarehousePaymentPicker } from '@/admin/sales/components/warehouse-payment-picker';
 import {
@@ -19,22 +20,20 @@ import { useCreateVentaMutation } from '@/admin/sales/hooks/use-create-venta-mut
 import { useMetodosPagoQuery } from '@/admin/sales/hooks/use-metodos-pago-query';
 import { useResolveProductoBarcodeMutation } from '@/admin/sales/hooks/use-resolve-producto-barcode-mutation';
 import { useStockProductoQuery } from '@/admin/sales/hooks/use-stock-producto-query';
-import { primaryGlowShadow, Colors } from '@/constants/theme';
-import { formatCurrency } from '@/core/format';
+import { Colors } from '@/constants/theme';
 import { invalidateAfterVenta } from '@/core/query/invalidate-after-venta';
 import { ApiError } from '@/core/http/api';
 import type { Cliente, Producto, VentaResponse } from '@/core/types';
 import { getAlmacenPredeterminado } from '@/core/utils/almacen';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -87,26 +86,7 @@ export default function VentaScreen() {
   const [success, setSuccess] = useState<VentaResponse | null>(null);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [qtyModalProduct, setQtyModalProduct] = useState<Producto | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSubscription = Keyboard.addListener(showEvent, (e) => {
-      Keyboard.scheduleLayoutAnimation(e);
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, (e) => {
-      Keyboard.scheduleLayoutAnimation(e);
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
+  const keyboardHeight = useKeyboardHeight();
 
   const stockQ = useStockProductoQuery(qtyModalProduct?.id ?? null, almacenId);
   const stockDisponible: number | null = stockQ.isSuccess
@@ -323,54 +303,17 @@ export default function VentaScreen() {
           />
         </ScrollView>
 
-        <View
-          style={[
-            styles.footer,
-            {
-              borderTopColor: c.border,
-              backgroundColor: c.background,
-              paddingBottom: insets.bottom + 8,
-              marginBottom: footerLift,
-            },
-          ]}>
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Total aprox.</Text>
-            <Text style={[styles.totalValue, { color: c.text }]}>{formatCurrency(totalEstimado)}</Text>
-          </View>
-
-          {submitErr ? <Text style={[styles.warn, { color: c.error }]}>{submitErr}</Text> : null}
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.confirm,
-              {
-                backgroundColor: c.tint,
-                opacity: createVenta.isPending ? 0.7 : pressed ? 0.92 : 1,
-              },
-              primaryGlowShadow(),
-            ]}
-            onPress={() => void abrirCobro()}
-            disabled={createVenta.isPending || createCreditoVenta.isPending}>
-            {createVenta.isPending ? (
-              <ActivityIndicator color={c.onPrimary} />
-            ) : (
-              <Text style={[styles.confirmText, { color: c.onPrimary }]}>Cobrar venta</Text>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.creditoBtn,
-              {
-                borderColor: c.tint,
-                opacity: createCreditoVenta.isPending ? 0.7 : pressed ? 0.92 : 1,
-              },
-            ]}
-            onPress={() => void abrirCredito()}
-            disabled={createVenta.isPending || createCreditoVenta.isPending}>
-            <Text style={[styles.creditoBtnText, { color: c.tint }]}>Vender a crédito</Text>
-          </Pressable>
-        </View>
+        <VentaFooter
+          c={c}
+          bottomInset={insets.bottom}
+          footerLift={footerLift}
+          total={totalEstimado}
+          submitErr={submitErr}
+          ventaPending={createVenta.isPending}
+          creditoPending={createCreditoVenta.isPending}
+          onCobrar={abrirCobro}
+          onCredito={abrirCredito}
+        />
       </View>
 
       <PagosVentaModal
@@ -438,27 +381,4 @@ const styles = StyleSheet.create({
   muted: { fontSize: 16, paddingVertical: 8 },
   warn: { marginTop: 8, fontSize: 14 },
   sectionMeta: { fontSize: 14, fontWeight: '700', marginTop: 16, marginBottom: 8 },
-  footer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  totalLabel: { fontSize: 15, fontWeight: '600' },
-  totalValue: { fontSize: 22, fontWeight: '800' },
-  confirm: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
-  confirmText: { fontSize: 17, fontWeight: '700' },
-  creditoBtn: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-    borderWidth: 1.5,
-  },
-  creditoBtnText: { fontSize: 16, fontWeight: '700' },
 });

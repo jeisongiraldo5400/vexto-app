@@ -4,11 +4,13 @@ import {
   type ModoClienteVenta,
 } from '@/admin/sales/components/cliente-venta-section';
 import type { CartLine } from '@/admin/sales/components/cart-lines-list';
+import { MontoInput } from '@/components/ui/monto-input';
 import { formatCurrency } from '@/core/format';
+import { parseMonto } from '@/core/utils/money';
 import type { Cliente } from '@/core/types';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -59,7 +61,19 @@ export function CreditoVentaModal({
   const [frecuenciaDias, setFrecuenciaDias] = useState('30');
   const [error, setError] = useState<string | null>(null);
 
-  const cuotaInicialNum = parseFloat(cuotaInicial) || 0;
+  // Cada apertura es una venta nueva: no arrastrar cliente ni cuota de la anterior.
+  useEffect(() => {
+    if (visible) {
+      setModoCliente('existente');
+      setCliente(null);
+      setCuotaInicial('0');
+      setNumeroCuotas('3');
+      setFrecuenciaDias('30');
+      setError(null);
+    }
+  }, [visible]);
+
+  const cuotaInicialNum = parseMonto(cuotaInicial) || 0;
   const numCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
   const freq = Math.max(1, parseInt(frecuenciaDias, 10) || 30);
   const saldoFinanciado = Math.max(0, totalVenta - cuotaInicialNum);
@@ -80,6 +94,10 @@ export function CreditoVentaModal({
     }
     if (cart.length === 0) {
       setError('El carrito está vacío');
+      return;
+    }
+    if (cuotaInicial.trim() && !Number.isFinite(parseMonto(cuotaInicial))) {
+      setError('Cuota inicial inválida');
       return;
     }
     if (cuotaInicialNum > totalVenta) {
@@ -126,10 +144,9 @@ export function CreditoVentaModal({
           />
 
           <Text style={[styles.label, { color: c.text }]}>Cuota inicial</Text>
-          <TextInput
+          <MontoInput
             value={cuotaInicial}
             onChangeText={setCuotaInicial}
-            keyboardType="decimal-pad"
             placeholder="Primera cuota del cronograma (opcional)"
             style={[styles.input, { borderColor: c.border, color: c.text }]}
           />

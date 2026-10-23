@@ -113,6 +113,14 @@ export function repairAction(
     ? postIdempotent(path, body)
     : apiFetch(path, { method, body });
 }
+/** Abono idempotente: `intent` se conserva en reintentos y se renueva tras el éxito. */
+export function payRepair(
+  id: string,
+  body: { monto: number; metodoPagoId: string },
+  intent: string,
+) {
+  return postIdempotent(`reparaciones/${id}/pagos`, body, intent);
+}
 export function estimateAction(id: string, action: string) {
   return apiFetch(`reparaciones/cotizaciones/${id}/${action}`, {
     method: "POST",
