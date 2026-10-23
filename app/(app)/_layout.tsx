@@ -53,6 +53,62 @@ export default function AppGroupLayout() {
         name="reparacion/[id]"
         options={{ headerShown: true, title: "Reparación" }}
       />
+      <Stack.Screen
+        name="clientes/index"
+        options={{ headerShown: true, title: "Clientes" }}
+      />
+      <Stack.Screen
+        name="clientes/nuevo"
+        options={{ headerShown: true, title: "Nuevo cliente" }}
+      />
+      <Stack.Screen
+        name="clientes/[id]"
+        options={{ headerShown: true, title: "Editar cliente" }}
+      />
+      <Stack.Screen
+        name="separados/index"
+        options={{ headerShown: true, title: "Separados" }}
+      />
+      <Stack.Screen
+        name="separados/nuevo"
+        options={{ headerShown: true, title: "Nuevo separado" }}
+      />
+      <Stack.Screen
+        name="separados/[id]"
+        options={{ headerShown: true, title: "Separado" }}
+      />
+      <Stack.Screen
+        name="creditos/index"
+        options={{ headerShown: true, title: "Créditos" }}
+      />
+      <Stack.Screen
+        name="creditos/[id]"
+        options={{ headerShown: true, title: "Crédito" }}
+      />
+      <Stack.Screen
+        name="pagos/index"
+        options={{ headerShown: true, title: "Pagos" }}
+      />
+      <Stack.Screen
+        name="pagos/nuevo"
+        options={{ headerShown: true, title: "Registrar pago" }}
+      />
+      <Stack.Screen
+        name="devoluciones/index"
+        options={{ headerShown: true, title: "Devoluciones" }}
+      />
+      <Stack.Screen
+        name="devoluciones/nueva"
+        options={{ headerShown: true, title: "Nueva devolución" }}
+      />
+      <Stack.Screen
+        name="devoluciones/[id]"
+        options={{ headerShown: true, title: "Devolución" }}
+      />
+      <Stack.Screen
+        name="perfil"
+        options={{ headerShown: true, title: "Mi perfil" }}
+      />
     </Stack>
   );
 }

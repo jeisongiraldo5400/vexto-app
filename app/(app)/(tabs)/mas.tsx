@@ -1,11 +1,41 @@
-import { canAccess } from "@/core/permissions";
+import { canAccess, canOpenPath } from "@/core/permissions";
 import { useAuth } from "@/admin/auth/hooks/use-auth";
+import { useAuthStore } from "@/admin/auth/store/auth-store";
 import { Colors, Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { type Href, useRouter } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 type OptionProps = { title: string; description: string; onPress: () => void };
+
+/** Módulos de gestión del menú; se muestran solo si la guarda de rutas los deja abrir. */
+const GESTION: { title: string; description: string; href: string }[] = [
+  {
+    title: "Clientes",
+    description: "Busca, crea y edita clientes.",
+    href: "/(app)/clientes",
+  },
+  {
+    title: "Separados",
+    description: "Aparta productos, registra abonos y entregas.",
+    href: "/(app)/separados",
+  },
+  {
+    title: "Créditos",
+    description: "Consulta saldos y registra abonos a crédito.",
+    href: "/(app)/creditos",
+  },
+  {
+    title: "Pagos",
+    description: "Pagos recibidos y abonos a ventas.",
+    href: "/(app)/pagos",
+  },
+  {
+    title: "Devoluciones",
+    description: "Devoluciones de clientes sobre una venta.",
+    href: "/(app)/devoluciones",
+  },
+];
 
 export default function MasScreen() {
   const scheme = useColorScheme();
@@ -65,6 +95,14 @@ export default function MasScreen() {
           Herramientas y configuración de tu sesión.
         </Text>
       </View>
+      {GESTION.filter((o) => canOpenPath(user, o.href)).map((o) => (
+        <Option
+          key={o.href}
+          title={o.title}
+          description={o.description}
+          onPress={() => router.push(o.href as Href)}
+        />
+      ))}
       {canAccess(user, "inventario", "productos:ver") && (
         <Option
           title="Productos"
@@ -87,9 +125,18 @@ export default function MasScreen() {
         />
       )}
       <Option
+        title="Mi perfil"
+        description="Tus datos y cambio de contraseña."
+        onPress={() => router.push("/(app)/perfil" as Href)}
+      />
+      <Option
         title="Cambiar empresa"
         description="Selecciona otra empresa asociada a tu usuario."
-        onPress={() => router.push("/(auth)/select-empresa" as Href)}
+        onPress={() =>
+          // select-empresa solo se muestra con needsCompanyPick; con la marca, las
+          // guardas de (app) e index llevan allí (navegar directo rebotaba a "/").
+          useAuthStore.setState({ needsCompanyPick: true })
+        }
       />
       <Pressable
         accessibilityRole="button"
