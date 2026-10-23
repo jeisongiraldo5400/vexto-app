@@ -1,18 +1,30 @@
 # Dependencias pendientes de revisión
 
-Auditoría npm del 9 de octubre de 2026 después de aplicar actualizaciones compatibles y overrides de PostCSS, brace-expansion y ws.
+Auditoría npm (`npm audit`, incluye dependencias de desarrollo) del 23 de octubre de 2026.
 
-Resultado: **43 avisos (23 altos, 20 moderados, 0 críticos)**. El conteo incluye dependencias transitivas y herramientas de desarrollo; no equivale a demostrar exposición de una aplicación instalada.
+## Aplicado sin salir de Expo SDK 54
 
-No se forzó un cambio mayor de Expo/React Native. Para algunas bibliotecas, la última versión publicada consultada sigue incluida en el rango del aviso (por ejemplo braces 3.0.3, node-forge 1.4.0 y sprintf-js 1.1.3). Otras correcciones cambian el formato/API de importación de dependencias que usa el SDK.
+- `expo` 54.0.37 → 54.0.38 (parche del SDK). Trae `@expo/config-plugins` 54.0.6, que usa `xcode` 4 y elimina el aviso de `uuid` (GHSA-w5hq-g745-h8pq).
+- `vitest` 4.1.11 → 4.1.12 (corrige `@vitest/mocker`, GHSA-qxg6-89mg-rqv8 y GHSA-xp26-3454-mjgp).
+- `npx expo install --fix` / `--check`: "Dependencies are up to date".
 
-| Dependencia raíz | Severidad npm | Rango afectado y aviso |
+Resultado: **de 13 avisos (8 moderados, 5 altos) a 8 (3 moderados, 5 altos)**.
+
+> Nota: npm 10.9 falla con `Cannot read properties of null (reading 'edgesOut')` al recalcular el árbol para el cambio de vitest; la instalación se hizo con `npx npm@11 install`. El lockfile sigue en formato v3 y `npm ci` de npm 10 lo acepta.
+
+## Pendiente (no se puede resolver con overrides compatibles)
+
+| Dependencia | Severidad | Por qué no se aplicó |
 |---|---|---|
-| braces | high | `<=3.0.3`: [braces vulnerable to stack-exhaustion denial of service through deeply nested patterns](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) |
-| decode-uri-component | moderate | `<=0.4.2`: [decode-uri-component: Denial of service via exponential decoding of malformed percent-encoded input](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr) |
-| image-size | high | `>=1.2.0 <=2.0.2`: [image-size: JXL and HEIF parsers allow denial of service through infinite loops](https://github.com/advisories/GHSA-5p2g-fcmc-qvqq)<br>`>=0.6.3 <=2.0.2`: [image-size: ICNS parser allows denial of service through an infinite loop](https://github.com/advisories/GHSA-w3rx-r6r6-pgpr) |
-| node-forge | high | `<=1.4.0`: [node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements](https://github.com/advisories/GHSA-86w9-cpqp-85rv) |
-| sprintf-js | moderate | `<=1.1.3`: [sprintf-js vulnerable to denial of service through unbounded precision specifiers](https://github.com/advisories/GHSA-hp3w-g68c-fv3c) |
-| uuid | moderate | `<11.1.1`: [uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided](https://github.com/advisories/GHSA-w5hq-g745-h8pq) |
+| node-forge (vía `@expo/cli` y `@expo/code-signing-certificates`) → arrastra `expo` | high | El aviso GHSA-86w9-cpqp-85rv cubre **todas** las versiones publicadas (`*`, última 1.4.0). No existe versión corregida. La "solución" de npm (expo 44) es un downgrade incorrecto. Solo afecta al CLI (firma de actualizaciones), no al bundle de la app. |
+| image-size 1.2.1 (vía `metro` 0.83) | high | Corregido solo en 2.0.3+. Metro 0.83 llama `imageSize(rutaDeArchivo)` y la v2 solo acepta buffers: un override rompería el empaquetado de assets. Requiere una versión de Metro que use la API v2 (SDK posterior). Solo afecta al servidor de desarrollo/exportación. |
+| decode-uri-component 0.2.2 (vía `query-string` 7 de `expo-router` 6) | moderate | La 0.5.x corregida es solo ESM y `query-string` 7 la carga con `require`. npm propone expo-router 58 (cambio mayor de SDK). |
 
-Reevaluar los avisos al publicarse parches y probar las actualizaciones con `expo install --check`, tipado, pruebas y exportaciones web/nativas. La migración de SDK también exige comprobar cámara, SecureStore, navegación, Reanimated y un build/dispositivo nativo. No se ha validado aquí la explotabilidad de cada aviso ni se han silenciado alertas de audit.
+Estos tres requieren una migración de SDK (o un parche upstream de Expo/Metro). No se silenciaron alertas.
+
+## expo-doctor
+
+17/18 comprobaciones correctas. La que falla es el esquema de `app.json`:
+
+- `android.usesCleartextTraffic` no es una propiedad válida en SDK 54 (se configura con `expo-build-properties`).
+- `icon` y `android.adaptiveIcon.*` usan `assets/logo/vexto.png` (216×198); deben ser imágenes cuadradas.
