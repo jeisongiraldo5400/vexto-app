@@ -1,3 +1,5 @@
+import { ReembolsoFields } from "@/admin/cash-register/components/cobro-fields";
+import { useMetodosCaja } from "@/admin/cash-register/hooks";
 import {
   ActionButton,
   Card,
@@ -7,6 +9,7 @@ import {
   Screen,
   Title,
 } from "@/components/ui/kit";
+import { formatCurrency } from "@/core/format";
 import { useActionRunner } from "@/core/query/use-action-runner";
 import { type Href, useRouter } from "expo-router";
 
@@ -16,6 +19,7 @@ import { DEVOLUCIONES_INVALIDATE, useDevolucionForm } from "./hooks";
 export function DevolucionCreateScreen() {
   const router = useRouter();
   const form = useDevolucionForm();
+  const metodos = useMetodosCaja();
   const { busy, run } = useActionRunner(DEVOLUCIONES_INVALIDATE);
   const v = form.venta;
 
@@ -78,6 +82,16 @@ export function DevolucionCreateScreen() {
             onChange={form.setMotivo}
             multiline
           />
+          {form.conCaja ? (
+            <ReembolsoFields
+              metodos={metodos.options}
+              metodoId={form.refundMethod}
+              onMetodo={form.setRefundMethod}
+              monto={form.refundAmount}
+              onMonto={form.setRefundAmount}
+              evaluado={{ error: null }}
+            />
+          ) : null}
           {form.error ? <Line tone="error">{form.error}</Line> : null}
           <ActionButton
             label="Registrar devolución"
@@ -86,7 +100,12 @@ export function DevolucionCreateScreen() {
             disabled={!!form.error}
             confirm={{
               title: "Registrar devolución",
-              message: `Se devolverán ${form.unidades} unidad(es) al inventario de ${v.almacenNombre || "la venta"}. ¿Continuar?`,
+              message:
+                `Se devolverán ${form.unidades} unidad(es) al inventario de ${v.almacenNombre || "la venta"}.` +
+                (form.reembolso.reembolso
+                  ? ` Se reembolsarán ${formatCurrency(form.reembolso.reembolso.monto)} desde tu caja.`
+                  : "") +
+                " ¿Continuar?",
             }}
             onPress={() => void save()}
           />

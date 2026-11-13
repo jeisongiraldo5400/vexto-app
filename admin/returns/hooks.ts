@@ -1,5 +1,7 @@
 import { useSessionQueryEnabled } from "@/admin/auth/hooks/use-session-query-enabled";
 import { useAuthStore } from "@/admin/auth/store/auth-store";
+import { evaluarReembolso } from "@/admin/cash-register/cobro";
+import { cajaHabilitada } from "@/core/caja/caja-guard";
 import { newIdempotencyIntent } from "@/core/http/idempotent";
 import { parseCantidad } from "@/core/utils/money";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -43,8 +45,18 @@ export function useDevolucionQuery(id: string) {
   });
 }
 
-/** Devolución de cliente sobre una venta buscada por factura. */
+/**
+ * Devolución de cliente sobre una venta buscada por factura. Con el módulo caja se
+ * puede reembolsar dinero; el tope (valor devuelto y saldo reembolsable) lo valida
+ * el backend porque la venta cargada no trae precios.
+ */
 export function useDevolucionForm() {
+  const conCaja = cajaHabilitada(useAuthStore((s) => s.user));
+  const [refundMethod, setRefundMethod] = useState("");
+  const [refundAmount, setRefundAmount] = useState("");
+  const reembolso = conCaja
+    ? evaluarReembolso(refundMethod, refundAmount)
+    : { error: null, reembolso: undefined };
   const [factura, setFactura] = useState("");
   const [venta, setVenta] = useState<VentaParaDevolucion | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
@@ -90,7 +102,7 @@ export function useDevolucionForm() {
         ? "Una cantidad supera lo pendiente por devolver."
         : lineas.length === 0
           ? "Indica al menos una cantidad a devolver."
-          : null;
+          : reembolso.error;
 
   const submit = async () => {
     if (!venta || error) throw new Error(error ?? "Busca la venta primero");
@@ -104,6 +116,7 @@ export function useDevolucionForm() {
           cantidad: l.cantidad,
         })),
         motivo: motivo.trim() || undefined,
+        ...(reembolso.reembolso ? { reembolso: reembolso.reembolso } : {}),
       },
       intent.current,
     );
@@ -122,6 +135,12 @@ export function useDevolucionForm() {
     setCantidad,
     motivo,
     setMotivo,
+    conCaja,
+    refundMethod,
+    setRefundMethod,
+    refundAmount,
+    setRefundAmount,
+    reembolso,
     unidades: lineas.reduce((a, l) => a + (l.cantidad > 0 ? l.cantidad : 0), 0),
     error,
     submit,

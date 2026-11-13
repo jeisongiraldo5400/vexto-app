@@ -1,7 +1,10 @@
 import { useSessionQueryEnabled } from "@/admin/auth/hooks/use-session-query-enabled";
 import { useAuthStore } from "@/admin/auth/store/auth-store";
 import { useMetodosPagoQuery } from "@/admin/sales/hooks/use-metodos-pago-query";
-import { esCreditoInterno } from "@/admin/sales/constants/metodos-pago";
+import {
+  esCreditoInterno,
+  esMetodoEfectivo,
+} from "@/admin/sales/constants/metodos-pago";
 import { newIdempotencyIntent } from "@/core/http/idempotent";
 import { parseMonto } from "@/core/utils/money";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -58,12 +61,17 @@ export function useAbonosCreditoQuery(
   });
 }
 
-/** Métodos activos para abonar (sin el crédito interno). */
-export function useMetodosAbono() {
-  const q = useMetodosPagoQuery();
-  const options = (q.data ?? [])
+/** Métodos activos para abonar (sin el crédito interno), con su marca de efectivo. */
+export function useMetodosAbono(active = true) {
+  const q = useMetodosPagoQuery(active);
+  const options = (Array.isArray(q.data) ? q.data : [])
     .filter((m) => m.estado === "activo" && !esCreditoInterno(m.codigo))
-    .map((m) => ({ id: m.id, nombre: m.nombre }));
+    .map((m) => ({
+      id: m.id,
+      nombre: m.nombre,
+      codigo: m.codigo,
+      esEfectivo: esMetodoEfectivo(m),
+    }));
   return { ...q, options };
 }
 

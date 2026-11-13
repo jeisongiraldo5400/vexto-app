@@ -1,8 +1,10 @@
+import { useCajaStatus } from '@/admin/cash-register/hooks';
 import { BarcodeScannerModal } from '@/admin/sales/components/barcode-scanner-modal';
 import {
   ClienteVentaSection,
   type ModoClienteVenta,
 } from '@/admin/sales/components/cliente-venta-section';
+import { CajaStatusBanner } from '@/admin/sales/components/caja-status-banner';
 import { CartLinesList, type CartLine } from '@/admin/sales/components/cart-lines-list';
 import { QuantityNumpadModal } from '@/admin/sales/components/quantity-numpad-modal';
 import { VentaFooter } from '@/admin/sales/components/venta-footer';
@@ -13,7 +15,10 @@ import {
   lineasToPayload,
   type PagoLineaMobile,
 } from '@/admin/sales/components/pagos-venta-modal';
-import { CreditoVentaModal } from '@/admin/sales/components/credito-venta-modal';
+import {
+  CreditoVentaModal,
+  type CreditoVentaParams,
+} from '@/admin/sales/components/credito-venta-modal';
 import { useCreateCreditoVentaMutation } from '@/admin/sales/hooks/use-create-credito-venta-mutation';
 import { useAlmacenesQuery } from '@/admin/sales/hooks/use-almacenes-query';
 import { useCreateVentaMutation } from '@/admin/sales/hooks/use-create-venta-mutation';
@@ -21,6 +26,11 @@ import { useMetodosPagoQuery } from '@/admin/sales/hooks/use-metodos-pago-query'
 import { useResolveProductoBarcodeMutation } from '@/admin/sales/hooks/use-resolve-producto-barcode-mutation';
 import { useStockProductoQuery } from '@/admin/sales/hooks/use-stock-producto-query';
 import { Colors } from '@/constants/theme';
+import {
+  CAJA_NO_ABIERTA_MENSAJE,
+  handleCajaNoAbierta,
+  promptAbrirCaja,
+} from '@/core/caja/caja-guard';
 import { invalidateAfterVenta } from '@/core/query/invalidate-after-venta';
 import { ApiError } from '@/core/http/api';
 import type { Cliente, Producto, VentaResponse } from '@/core/types';
@@ -52,6 +62,7 @@ export default function VentaScreen() {
   const resolveBarcode = useResolveProductoBarcodeMutation();
   const createVenta = useCreateVentaMutation();
   const createCreditoVenta = useCreateCreditoVentaMutation();
+  const caja = useCajaStatus();
 
   const almacenes = useMemo(() => (almacenesQ.data ?? []).filter((x) => x.activo), [almacenesQ.data]);
   const metodos = useMemo(() => {
@@ -171,6 +182,12 @@ export default function VentaScreen() {
       setSubmitErr('Agrega al menos un producto al carrito.');
       return;
     }
+    // Con el módulo caja, cobrar exige la caja abierta de quien cobra.
+    if (caja.bloqueaCobro) {
+      setSubmitErr(CAJA_NO_ABIERTA_MENSAJE);
+      promptAbrirCaja();
+      return;
+    }
     setPagosModalOpen(true);
   }
 
@@ -208,17 +225,18 @@ export default function VentaScreen() {
       setModoCliente('ninguno');
       setPagosModalOpen(false);
     } catch (e) {
+      if (handleCajaNoAbierta(e, queryClient)) {
+        // El aviso lleva a la caja: se cierra el cobro para no navegar detrás del modal.
+        setPagosModalOpen(false);
+        setSubmitErr(CAJA_NO_ABIERTA_MENSAJE);
+        return;
+      }
       const msg = e instanceof ApiError ? e.message : 'No se pudo registrar la venta.';
       setSubmitErr(msg);
     }
   }
 
-  async function confirmarVentaCredito(params: {
-    clienteId: string;
-    cuotaInicial: number;
-    numeroCuotas: number;
-    frecuenciaDias: number;
-  }) {
+  async function confirmarVentaCredito(params: CreditoVentaParams) {
     setSubmitErr(null);
     if (!almacenId) return;
 
@@ -230,6 +248,9 @@ export default function VentaScreen() {
         cuotaInicial: params.cuotaInicial,
         numeroCuotas: params.numeroCuotas,
         frecuenciaDias: params.frecuenciaDias,
+        ...(params.pagosCuotaInicial?.length
+          ? { pagosCuotaInicial: params.pagosCuotaInicial }
+          : {}),
       });
       invalidateAfterVenta(queryClient);
       setSuccess({
@@ -243,6 +264,11 @@ export default function VentaScreen() {
       setModoCliente('ninguno');
       setCreditoModalOpen(false);
     } catch (e) {
+      if (handleCajaNoAbierta(e, queryClient)) {
+        setCreditoModalOpen(false);
+        setSubmitErr(CAJA_NO_ABIERTA_MENSAJE);
+        return;
+      }
       const msg = e instanceof ApiError ? e.message : 'No se pudo registrar la venta a crédito.';
       setSubmitErr(msg);
     }
@@ -277,6 +303,7 @@ export default function VentaScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
+          <CajaStatusBanner status={caja} />
           {metaErr ? <Text style={[styles.warn, { color: c.warning }]}>{metaErr}</Text> : null}
 
           <CartLinesList cart={cart} onChangeQty={setQty} onScanPress={openScanner} />
@@ -332,6 +359,7 @@ export default function VentaScreen() {
 
       <CreditoVentaModal
         visible={creditoModalOpen}
+        metodos={metodos}
         cart={cart}
         almacenId={almacenId}
         totalVenta={totalEstimado}

@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 
 import { salesQueryKeys } from './query-keys';
 
-export function useMetodosPagoQuery() {
-  const enabled = useSessionQueryEnabled();
+/** `active: false` pospone la consulta (pantallas que solo la usan con el módulo caja). */
+export function useMetodosPagoQuery(active = true) {
+  const enabled = useSessionQueryEnabled() && active;
   return useQuery({
     queryKey: salesQueryKeys.metodosPago,
     queryFn: () => fetchMetodosPago(),

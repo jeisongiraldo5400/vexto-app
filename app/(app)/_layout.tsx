@@ -106,6 +106,22 @@ export default function AppGroupLayout() {
         options={{ headerShown: true, title: "Devolución" }}
       />
       <Stack.Screen
+        name="caja/index"
+        options={{ headerShown: true, title: "Caja" }}
+      />
+      <Stack.Screen
+        name="caja/cerrar"
+        options={{ headerShown: true, title: "Cerrar caja" }}
+      />
+      <Stack.Screen
+        name="caja/historial"
+        options={{ headerShown: true, title: "Historial de cajas" }}
+      />
+      <Stack.Screen
+        name="caja/[id]"
+        options={{ headerShown: true, title: "Detalle de caja" }}
+      />
+      <Stack.Screen
         name="perfil"
         options={{ headerShown: true, title: "Mi perfil" }}
       />

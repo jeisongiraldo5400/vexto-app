@@ -1,3 +1,4 @@
+import { esMetodoEfectivo } from '@/admin/sales/constants/metodos-pago';
 import { MontoInput } from '@/components/ui/monto-input';
 import { formatCurrency } from '@/core/format';
 import type { MetodoPago } from '@/core/types';
@@ -46,7 +47,7 @@ export function createPagoLinea(metodoPagoId: string, monto = ''): PagoLineaMobi
 }
 
 export function findDefaultMetodoId(metodos: MetodoPago[]): string {
-  const efectivo = metodos.find((m) => m.nombre.toLowerCase().includes('efectivo'));
+  const efectivo = metodos.find((m) => esMetodoEfectivo(m));
   return efectivo?.id ?? metodos[0]?.id ?? '';
 }
 
@@ -75,7 +76,7 @@ export function validarPagosLineasMobile(
     const m = metodos.find((mp) => mp.id === l.metodoPagoId);
     const monto = montoOCero(l.monto);
     if (monto <= 0) return 'Cada línea debe tener un monto mayor a 0';
-    if (m?.codigo === 'efectivo') {
+    if (esMetodoEfectivo(m)) {
       const rec = parseMonto(l.montoRecibido);
       if (Number.isNaN(rec) || rec < monto) {
         return 'Indica el monto recibido en efectivo (≥ monto aplicado)';
@@ -188,7 +189,7 @@ export function PagosMultiSelectSection({
 
       {lineas.map((linea) => {
         const metodo = metodos.find((m) => m.id === linea.metodoPagoId);
-        const esCash = metodo?.codigo === 'efectivo';
+        const esCash = esMetodoEfectivo(metodo);
         const monto = montoOCero(linea.monto);
         const recibido = montoOCero(linea.montoRecibido);
         const vuelto = esCash && recibido >= monto ? recibido - monto : null;

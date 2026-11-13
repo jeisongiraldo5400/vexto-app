@@ -37,7 +37,7 @@ export default function UnidadesScreen() {
           </View>
         )}
         ListEmptyComponent={
-          !errMsg ? <Text style={[styles.empty, { color: c.textMuted }]}>No hay unidades registradas.</Text> : null
+          !errMsg ? <Text style={[styles.empty, { color: c.textMuted }]}>No hay unidades registradas.</Text> : undefined
         }
       />
     </View>

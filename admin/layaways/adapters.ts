@@ -94,21 +94,49 @@ export type CrearSeparadoPayload = {
   anticipo: number;
   /** `YYYY-MM-DD`, posterior a hoy. */
   fechaLimiteRetiro: string;
+  /** Método del anticipo; obligatorio con el módulo caja y anticipo > 0. */
+  metodoPagoId?: string;
+  /** Efectivo entregado por el cliente (solo métodos en efectivo). */
+  montoRecibido?: number;
 };
+
+/** Método y efectivo recibido de un cobro de separado (módulo caja). */
+export type CobroSeparado = { metodoPagoId?: string; montoRecibido?: number };
+export type ReembolsoSeparado = { metodoPagoId: string; monto: number };
 
 export function crearSeparado(body: CrearSeparadoPayload, intent?: string) {
   return postIdempotent<Separado>("separados", body, intent);
 }
 
-/** Abono al saldo. `intent` separa dos abonos reales del mismo monto. */
-export function abonarSeparado(id: string, monto: number, intent?: string) {
-  return postIdempotent<Separado>(`separados/${id}/abonar`, { monto }, intent);
+/**
+ * Abono al saldo. `intent` separa dos abonos reales del mismo monto; `cobro` lleva
+ * el método (y el efectivo recibido) cuando la empresa usa el módulo caja.
+ */
+export function abonarSeparado(
+  id: string,
+  monto: number,
+  intent?: string,
+  cobro: CobroSeparado = {},
+) {
+  return postIdempotent<Separado>(
+    `separados/${id}/abonar`,
+    { monto, ...cobro },
+    intent,
+  );
 }
 
-export function cancelarSeparado(id: string, observaciones: string) {
+/** `reembolso`: dinero devuelto al cliente (≤ total abonado), solo con módulo caja. */
+export function cancelarSeparado(
+  id: string,
+  observaciones: string,
+  reembolso?: ReembolsoSeparado,
+) {
   return apiFetch<Separado>(`separados/${id}/cancelar`, {
     method: "POST",
-    body: { observaciones: observaciones.trim() },
+    body: {
+      observaciones: observaciones.trim(),
+      ...(reembolso ? { reembolso } : {}),
+    },
   });
 }
 

@@ -7,7 +7,6 @@
     "icon": "./assets/logo/vexto.png",
     "scheme": "vextoapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -21,14 +20,12 @@
       "bundleIdentifier": "com.jeison5400.vextoapp"
     },
     "android": {
-      "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/logo/vexto.png",
         "backgroundImage": "./assets/logo/vexto.png",
         "monochromeImage": "./assets/logo/vexto.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA"
@@ -59,7 +56,15 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": false
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

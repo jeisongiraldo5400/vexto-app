@@ -49,7 +49,7 @@ export function RepairDetailScreen() {
   const estimate = useEstimateForm(id);
   const part = usePartForm(id);
   const qa = useQaForm(id);
-  const payment = usePaymentForm(id);
+  const payment = usePaymentForm(id, resources.data?.metodos);
   const warranty = useWarrantyForm(id);
   const photos = usePhotoState(id);
   const ctx = { id, c, can, busy, run };

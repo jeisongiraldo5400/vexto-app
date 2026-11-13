@@ -1,3 +1,4 @@
+import { handleCajaNoAbierta } from "@/core/caja/caja-guard";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -6,7 +7,8 @@ export type ActionRun = (fn: () => Promise<unknown>) => Promise<boolean>;
 
 /**
  * Ejecuta una acción a la vez (bloquea dobles toques), invalida `invalidate`
- * tras el éxito y muestra el error en un Alert. Devuelve `true` si tuvo éxito.
+ * tras el éxito y muestra el error en un Alert (`CAJA_NO_ABIERTA` ofrece abrir la
+ * caja). Devuelve `true` si tuvo éxito.
  */
 export function useActionRunner(invalidate: QueryKey[]) {
   const qc = useQueryClient();
@@ -23,6 +25,8 @@ export function useActionRunner(invalidate: QueryKey[]) {
       );
       return true;
     } catch (e) {
+      // Cobro sin caja abierta: aviso propio con acceso a la caja.
+      if (handleCajaNoAbierta(e, qc)) return false;
       Alert.alert(
         "No se pudo completar",
         e instanceof Error ? e.message : "Intenta nuevamente",

@@ -1,3 +1,4 @@
+import { handleCajaNoAbierta } from "@/core/caja/caja-guard";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -20,6 +21,7 @@ export function useRepairRunner() {
       await fn();
       await qc.invalidateQueries({ queryKey: ["reparaciones"] });
     } catch (e) {
+      if (handleCajaNoAbierta(e, qc)) return;
       Alert.alert(
         "No se pudo completar",
         e instanceof Error ? e.message : "Intenta nuevamente",

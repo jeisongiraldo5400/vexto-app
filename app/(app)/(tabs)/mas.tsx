@@ -11,6 +11,11 @@ type OptionProps = { title: string; description: string; onPress: () => void };
 /** Módulos de gestión del menú; se muestran solo si la guarda de rutas los deja abrir. */
 const GESTION: { title: string; description: string; href: string }[] = [
   {
+    title: "Caja",
+    description: "Abre tu caja, registra movimientos y haz el cierre.",
+    href: "/(app)/caja",
+  },
+  {
     title: "Clientes",
     description: "Busca, crea y edita clientes.",
     href: "/(app)/clientes",
@@ -37,19 +42,10 @@ const GESTION: { title: string; description: string; href: string }[] = [
   },
 ];
 
-export default function MasScreen() {
-  const scheme = useColorScheme();
-  const c = Colors[scheme ?? "light"];
-  const router = useRouter();
-  const { user, signOut } = useAuth();
-  const chatActivo = canAccess(
-    user,
-    "chat_ventas",
-    "ventas:crear",
-    "pos:crear",
-  );
-
-  const Option = ({ title, description, onPress }: OptionProps) => (
+/** Fila del menú; a nivel de módulo para no recrear el componente en cada render. */
+function Option({ title, description, onPress }: OptionProps) {
+  const c = Colors[useColorScheme() ?? "light"];
+  return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
@@ -69,6 +65,19 @@ export default function MasScreen() {
         {description}
       </Text>
     </Pressable>
+  );
+}
+
+export default function MasScreen() {
+  const scheme = useColorScheme();
+  const c = Colors[scheme ?? "light"];
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+  const chatActivo = canAccess(
+    user,
+    "chat_ventas",
+    "ventas:crear",
+    "pos:crear",
   );
 
   return (

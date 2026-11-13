@@ -129,3 +129,35 @@ describe('pantallas de devoluciones', () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/(app)/devoluciones/d2'));
   });
 });
+
+describe('devolución con módulo caja', () => {
+  it('reembolso opcional: con monto exige método y viaja en el payload', async () => {
+    signInAs(makeUser(['devoluciones:ver', 'devoluciones:crear'], ['ventas', 'caja']));
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation(async (path: string, init?: unknown) =>
+      path === '/metodos-pago'
+        ? [{ id: 'cash', nombre: 'Efectivo', codigo: 'efectivo', estado: 'activo', esEfectivo: true }]
+        : base(path, init),
+    );
+    const { result } = renderHook(() => useDevolucionForm(), withQuery);
+    result.current.setFactura('FV-7');
+    await result.current.buscar();
+    await waitFor(() => expect(result.current.venta).not.toBeNull());
+    result.current.setCantidad('p1', '1');
+    expect(result.current.error).toBeNull();
+    result.current.setRefundAmount('10.000');
+    expect(result.current.error).toBe('Selecciona el método del reembolso.');
+    result.current.setRefundMethod('cash');
+    expect(result.current.error).toBeNull();
+    await result.current.submit();
+    expect(postIdempotent.mock.calls[0][1]).toMatchObject({ reembolso: { metodoPagoId: 'cash', monto: 10000 } });
+  });
+
+  it('sin módulo caja el payload no cambia y no hay campos de reembolso', async () => {
+    const view = render(withQuery(<DevolucionCreateScreen />));
+    view.changeText({ placeholder: 'Número de factura' }, 'FV-7');
+    view.press('Cargar venta');
+    await waitFor(() => view.getByText('FV-7'));
+    expect(view.queryByText(/reembolsar/i)).toBeNull();
+  });
+});

@@ -221,3 +221,29 @@ describe('useRepairRunner', () => {
     expect(Alert.alert).toHaveBeenCalledWith('No se pudo completar', 'Estado inválido');
   });
 });
+
+describe('usePaymentForm con módulo caja', () => {
+  it('en efectivo envía el recibido y muestra el cambio; sin módulo lo ignora', async () => {
+    const { signInAs, makeUser } = await import('@/test-utils/fixtures');
+    const metodos = [{ id: 'cash', nombre: 'Efectivo', esEfectivo: true }, { id: 'nequi', nombre: 'Nequi', esEfectivo: false }];
+    signInAs(makeUser(['pagos:crear'], ['reparaciones', 'caja']));
+    const { result } = renderHook(() => usePaymentForm('r1', metodos));
+    result.current.setMethod('cash');
+    result.current.setAmount('30.000');
+    result.current.setReceived('25.000');
+    expect(result.current.invalid).toBe(true);
+    result.current.setReceived('50.000');
+    expect(result.current.cobro.cambio).toBe(20000);
+    await result.current.pay();
+    expect(postIdempotent).toHaveBeenLastCalledWith('reparaciones/r1/pagos', { monto: 30000, metodoPagoId: 'cash', montoRecibido: 50000 }, expect.any(String));
+
+    signInAs(makeUser(['pagos:crear'], ['reparaciones']));
+    const sin = renderHook(() => usePaymentForm('r1', metodos)).result;
+    sin.current.setMethod('cash');
+    sin.current.setAmount('30.000');
+    sin.current.setReceived('50.000');
+    expect(sin.current.cobro.esEfectivo).toBe(false);
+    await sin.current.pay();
+    expect(postIdempotent).toHaveBeenLastCalledWith('reparaciones/r1/pagos', { monto: 30000, metodoPagoId: 'cash' }, expect.any(String));
+  });
+});

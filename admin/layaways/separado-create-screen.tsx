@@ -1,3 +1,5 @@
+import { MetodoCobroFields } from "@/admin/cash-register/components/cobro-fields";
+import { useMetodosCaja } from "@/admin/cash-register/hooks";
 import { ClientePicker } from "@/admin/customers/components/cliente-picker";
 import { ChoiceField } from "@/admin/repairs/choice-field";
 import { useAlmacenesQuery } from "@/admin/sales/hooks/use-almacenes-query";
@@ -23,7 +25,8 @@ import { useSeparadoForm } from "./use-separado-form";
 
 export function SeparadoCreateScreen() {
   const router = useRouter();
-  const form = useSeparadoForm();
+  const metodos = useMetodosCaja();
+  const form = useSeparadoForm(metodos.options);
   const almacenes = useAlmacenesQuery();
   const { busy, run } = useActionRunner(SEPARADOS_INVALIDATE);
   const { almacenId, setAlmacenId } = form;
@@ -65,6 +68,16 @@ export function SeparadoCreateScreen() {
         value={form.anticipo}
         onChange={form.setAnticipo}
       />
+      {form.cobraAnticipo ? (
+        <MetodoCobroFields
+          metodos={metodos.options}
+          metodoId={form.method}
+          onMetodo={form.setMethod}
+          recibido={form.received}
+          onRecibido={form.setReceived}
+          cobro={form.cobro}
+        />
+      ) : null}
       <Field
         label="Fecha límite de retiro (AAAA-MM-DD)"
         value={form.fecha}

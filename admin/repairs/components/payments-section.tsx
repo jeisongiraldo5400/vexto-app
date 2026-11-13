@@ -55,6 +55,20 @@ export function PaymentsSection({
             onChange={form.setAmount}
             kind="money"
           />
+          {form.cobro.esEfectivo ? (
+            <>
+              <RField
+                label="Monto recibido (opcional)"
+                value={form.received}
+                onChange={form.setReceived}
+                kind="money"
+              />
+              {form.cobro.error ? <RText>{form.cobro.error}</RText> : null}
+              {form.cobro.cambio != null ? (
+                <RText>{`Cambio: ${formatCurrency(form.cobro.cambio)}`}</RText>
+              ) : null}
+            </>
+          ) : null}
           <RButton
             label="Registrar pago"
             action={form.pay}

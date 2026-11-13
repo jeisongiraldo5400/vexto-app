@@ -110,6 +110,8 @@ export type CrearDevolucionClientePayload = {
   almacenId: string;
   items: { productoId: string; cantidad: number }[];
   motivo?: string;
+  /** Dinero devuelto al cliente; con el módulo caja sale de la caja de quien registra. */
+  reembolso?: { metodoPagoId: string; monto: number };
 };
 
 export function crearDevolucionCliente(

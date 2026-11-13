@@ -47,10 +47,18 @@ vi.mock('expo-camera', () => ({
   CameraView: 'CameraView',
   useCameraPermissions: () => [{ granted: true }, vi.fn(async () => ({ granted: true }))],
 }));
+vi.mock('expo-print', () => ({
+  printAsync: vi.fn(async () => {}),
+  printToFileAsync: vi.fn(async () => ({ uri: 'file:///tmp/cierre.pdf', numberOfPages: 1 })),
+}));
+vi.mock('expo-sharing', () => ({
+  isAvailableAsync: vi.fn(async () => true),
+  shareAsync: vi.fn(async () => {}),
+}));
 vi.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
 vi.mock('@expo/vector-icons', () => ({ MaterialIcons: 'Icon' }));
 vi.mock('@expo/vector-icons/MaterialIcons', () => ({ default: 'Icon' }));
-vi.mock('@react-navigation/native', () => ({
+vi.mock('expo-router/react-navigation', () => ({
   // Se ejecuta como efecto de montaje: suficiente para pantallas enfocadas.
   useFocusEffect: (cb: () => void | (() => void)) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

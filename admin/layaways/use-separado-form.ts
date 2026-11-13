@@ -1,3 +1,10 @@
+import { useAuthStore } from "@/admin/auth/store/auth-store";
+import {
+  cobroPayload,
+  evaluarCobro,
+  type MetodoCobro,
+} from "@/admin/cash-register/cobro";
+import { cajaHabilitada } from "@/core/caja/caja-guard";
 import { newIdempotencyIntent } from "@/core/http/idempotent";
 import type { Cliente, Producto } from "@/core/types";
 import { parseCantidad, parseMonto } from "@/core/utils/money";
@@ -17,8 +24,14 @@ export type SeparadoLinea = {
   cantidad: string;
 };
 
-/** Estado y validación del formulario de nuevo separado (sin IVA). */
-export function useSeparadoForm() {
+/**
+ * Estado y validación del formulario de nuevo separado (sin IVA). Con el módulo
+ * caja, un anticipo mayor a 0 exige método de pago (`metodos`).
+ */
+export function useSeparadoForm(metodos: MetodoCobro[] = []) {
+  const conCaja = cajaHabilitada(useAuthStore((s) => s.user));
+  const [method, setMethod] = useState("");
+  const [received, setReceived] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [almacenId, setAlmacenId] = useState("");
   const [lineas, setLineas] = useState<SeparadoLinea[]>([]);
@@ -60,6 +73,13 @@ export function useSeparadoForm() {
       ) * 100,
     ) / 100;
   const anticipoNum = anticipo.trim() === "" ? 0 : parseMonto(anticipo);
+  /** El anticipo solo es un cobro (método, caja) cuando es mayor a 0. */
+  const cobraAnticipo = conCaja && anticipoNum > 0;
+  const cobro = evaluarCobro(
+    cobraAnticipo ? metodos.find((m) => m.id === method) : undefined,
+    anticipoNum,
+    received,
+  );
 
   const error = !cliente
     ? "Selecciona un cliente."
@@ -75,7 +95,11 @@ export function useSeparadoForm() {
               ? "El anticipo no puede superar el total."
               : !esFechaRetiroValida(fecha)
                 ? "La fecha límite debe ser posterior a hoy (AAAA-MM-DD)."
-                : null;
+                : cobraAnticipo && !method
+                  ? "Selecciona el método de pago del anticipo."
+                  : cobraAnticipo && cobro.error
+                    ? cobro.error
+                    : null;
 
   const submit = async () => {
     if (error || !cliente) throw new Error(error ?? "Formulario inválido");
@@ -90,6 +114,7 @@ export function useSeparadoForm() {
         })),
         anticipo: anticipoNum,
         fechaLimiteRetiro: fecha,
+        ...(cobraAnticipo ? cobroPayload(method, cobro) : {}),
       },
       intent.current,
     );
@@ -109,6 +134,12 @@ export function useSeparadoForm() {
     anticipo,
     setAnticipo,
     anticipoNum,
+    cobraAnticipo,
+    method,
+    setMethod,
+    received,
+    setReceived,
+    cobro,
     fecha,
     setFecha,
     total,

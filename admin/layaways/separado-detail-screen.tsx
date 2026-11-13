@@ -1,5 +1,10 @@
 import { useAuthStore } from "@/admin/auth/store/auth-store";
 import {
+  MetodoCobroFields,
+  ReembolsoFields,
+} from "@/admin/cash-register/components/cobro-fields";
+import { useMetodosCaja } from "@/admin/cash-register/hooks";
+import {
   ActionButton,
   Card,
   Field,
@@ -46,10 +51,11 @@ function SeparadoDetail({ separado: s }: { separado: Separado }) {
   const user = useAuthStore((st) => st.user);
   const can = (p: string) => canAccess(user, "ventas", p);
   const { busy, run } = useActionRunner(SEPARADOS_INVALIDATE);
-  const abono = useAbonoSeparadoForm(s.id, s.saldoPendiente);
-  const cancelar = useCancelarSeparadoForm(s.id);
+  const metodos = useMetodosCaja();
   const activo = s.estado === "pendiente";
   const abonado = Math.max(0, s.total - s.saldoPendiente);
+  const abono = useAbonoSeparadoForm(s.id, s.saldoPendiente, metodos.options);
+  const cancelar = useCancelarSeparadoForm(s.id, abonado);
 
   return (
     <Screen>
@@ -91,6 +97,16 @@ function SeparadoDetail({ separado: s }: { separado: Separado }) {
             onChange={abono.setAmount}
           />
           {abono.error ? <Line tone="error">{abono.error}</Line> : null}
+          {abono.conCaja ? (
+            <MetodoCobroFields
+              metodos={metodos.options}
+              metodoId={abono.method}
+              onMetodo={abono.setMethod}
+              recibido={abono.received}
+              onRecibido={abono.setReceived}
+              cobro={abono.cobro}
+            />
+          ) : null}
           <ActionButton
             label="Registrar abono"
             variant="primary"
@@ -132,6 +148,17 @@ function SeparadoDetail({ separado: s }: { separado: Separado }) {
               {`El motivo debe tener al menos ${MIN_OBSERVACIONES_CANCELACION} caracteres.`}
             </Line>
           ) : null}
+          {cancelar.conCaja && abonado > 0 ? (
+            <ReembolsoFields
+              metodos={metodos.options}
+              metodoId={cancelar.refundMethod}
+              onMetodo={cancelar.setRefundMethod}
+              monto={cancelar.refundAmount}
+              onMonto={cancelar.setRefundAmount}
+              evaluado={cancelar.reembolso}
+              maximo={abonado}
+            />
+          ) : null}
           <ActionButton
             label="Cancelar separado"
             variant="danger"
@@ -139,8 +166,9 @@ function SeparadoDetail({ separado: s }: { separado: Separado }) {
             disabled={cancelar.invalid}
             confirm={{
               title: "Cancelar separado",
-              message:
-                "Se liberará el stock reservado y se anularán el anticipo y los abonos. ¿Continuar?",
+              message: cancelar.reembolso.reembolso
+                ? `Se liberará el stock reservado y se reembolsarán ${formatCurrency(cancelar.reembolso.reembolso.monto)} desde tu caja. ¿Continuar?`
+                : "Se liberará el stock reservado y se anularán el anticipo y los abonos. ¿Continuar?",
             }}
             onPress={() => void run(cancelar.cancel)}
           />

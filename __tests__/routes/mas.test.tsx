@@ -23,6 +23,7 @@ vi.mock('@/admin/auth/hooks/use-auth', async () => {
 vi.mock('@/core/http/api', async () => ({ ...(await import('@/core/http/api-error')), apiFetch: vi.fn(() => new Promise(() => {})) }));
 
 const OPTIONS: [string, string][] = [
+  ['Caja', '/(app)/caja'],
   ['Productos', '/(app)/(tabs)/productos'],
   ['Venta por chat', '/(app)/(tabs)/chat-venta'],
   ['Gastos', '/(app)/gastos'],
@@ -55,6 +56,10 @@ describe('MasScreen', () => {
     [['clientes:ver', 'separados:ver', 'ventas:ver', 'pagos:ver', 'devoluciones:ver'], ['clientes', 'ventas', 'pagos']],
     [['clientes:ver', 'separados:ver', 'ventas:ver', 'pagos:ver', 'devoluciones:ver'], []],
     [['separados:crear', 'pagos:crear'], ['ventas', 'pagos']],
+    [['caja:abrir', 'caja:cerrar'], ['caja']],
+    [['caja:ver'], ['pos', 'caja']],
+    [['caja:abrir'], ['pos']],
+    [['pos:crear'], ['pos', 'caja']],
   ])('con permisos %j y módulos %j muestra solo opciones abribles', (permisos, modulos) => {
     signInAs(makeUser(permisos, modulos));
     const user = useAuthStore.getState().user;

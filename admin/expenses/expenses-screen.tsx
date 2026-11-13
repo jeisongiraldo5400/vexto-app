@@ -23,6 +23,7 @@ import {
   Text,
   TextInput,
   View,
+  type ScrollViewInstance,
 } from "react-native";
 
 type Expense = {
@@ -72,7 +73,7 @@ export function ExpensesScreen() {
   const [notes, setNotes] = useState("");
   const pending = useRef(false);
   const createIntent = useRef("");
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
   const [busy, setBusy] = useState(false);
   const open = (e: Expense | null) => {
     if (!e) createIntent.current = newIdempotencyIntent();

@@ -180,12 +180,20 @@ describe('PagosVentaModal', () => {
 });
 
 describe('CreditoVentaModal', () => {
+  const metodosCredito: MetodoPago[] = [
+    { id: 'cash', nombre: 'Caja menor', codigo: 'caja_menor', estado: 'activo', esEfectivo: true },
+    { id: 'nequi', nombre: 'Nequi', codigo: 'nequi', estado: 'activo', esEfectivo: false },
+    { id: 'cred', nombre: 'Crédito', codigo: 'credito', estado: 'activo', esEfectivo: false },
+    { id: 'sep', nombre: 'Separado', codigo: 'separado', estado: 'activo', esEfectivo: false },
+    { id: 'old', nombre: 'Cheque', codigo: 'cheque', estado: 'inactivo', esEfectivo: false },
+  ];
+  const soloNequi = [metodosCredito[1]];
   const cart = [{ producto: { id: 'p', codigo: 'c', codigoBarras: null, nombre: 'Tv', precioVenta: 300000, unidadMedidaId: 'u', estado: 'a' }, cantidad: 1, stockDisponible: null }];
-  const setup = (props: Partial<{ almacenId: string | null; cart: typeof cart }> = {}) => {
+  const setup = (props: Partial<{ almacenId: string | null; cart: typeof cart; metodos: MetodoPago[] }> = {}) => {
     const onConfirm = vi.fn();
     const view = render(
       withQuery(
-        <CreditoVentaModal visible cart={props.cart ?? cart} almacenId={props.almacenId === undefined ? 'a1' : props.almacenId}
+        <CreditoVentaModal visible cart={props.cart ?? cart} metodos={props.metodos ?? soloNequi} almacenId={props.almacenId === undefined ? 'a1' : props.almacenId}
           totalVenta={300000} onConfirm={onConfirm} onClose={vi.fn()} tint="b" onPrimary="w" />,
       ),
     );
@@ -235,7 +243,79 @@ describe('CreditoVentaModal', () => {
     expect(view.text()).toContain('Inicial');
     expect(view.text()).toContain('$50.000');
     view.press('Confirmar crédito');
-    expect(onConfirm).toHaveBeenCalledWith({ clienteId: 'c1', cuotaInicial: 100000, numeroCuotas: 4, frecuenciaDias: 15 });
+    expect(onConfirm).toHaveBeenCalledWith({
+      clienteId: 'c1',
+      cuotaInicial: 100000,
+      numeroCuotas: 4,
+      frecuenciaDias: 15,
+      pagosCuotaInicial: [{ metodoPagoId: 'nequi', monto: 100000 }],
+    });
+  });
+
+  it('sin cuota inicial no pide métodos ni envía pagosCuotaInicial', async () => {
+    const { view, onConfirm } = setup({ metodos: metodosCredito });
+    await pickCliente(view);
+    expect(view.queryByText('Cobro de la cuota inicial')).toBeNull();
+    view.press('Confirmar crédito');
+    expect(onConfirm).toHaveBeenCalledWith({ clienteId: 'c1', cuotaInicial: 0, numeroCuotas: 3, frecuenciaDias: 30 });
+  });
+
+  it('cuota inicial en efectivo: excluye crédito/separado/inactivos, exige recibido y muestra el cambio', async () => {
+    const { view, onConfirm } = setup({ metodos: metodosCredito });
+    await pickCliente(view);
+    view.changeText({ placeholder: 'Primera cuota del cronograma (opcional)' }, '100.000');
+    view.getByText('Cobro de la cuota inicial');
+    // Métodos ofrecidos: solo efectivo y Nequi.
+    view.getByText('Caja menor');
+    view.getByText('Nequi');
+    expect(view.queryByText('Separado')).toBeNull();
+    expect(view.queryByText('Cheque')).toBeNull();
+    expect(view.queryAllByText('Crédito')).toHaveLength(0);
+    // La línea por defecto es el efectivo (por esEfectivo) por toda la cuota.
+    view.getByText('Recibido');
+    view.press('Confirmar crédito');
+    expect(view.text()).toContain('Indica el monto recibido en efectivo (≥ monto aplicado)');
+    expect(onConfirm).not.toHaveBeenCalled();
+    view.changeText(view.queryAll((n) => n.type === 'TextInput' && n.props.placeholder === '0')[1], '120.000');
+    view.getByText('Vuelto: $20.000');
+    view.press('Confirmar crédito');
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cuotaInicial: 100000,
+        pagosCuotaInicial: [{ metodoPagoId: 'cash', monto: 100000, montoRecibido: 120000 }],
+      }),
+    );
+  });
+
+  it('cuota inicial con varios métodos: la suma debe igualar la cuota', async () => {
+    const { view, onConfirm } = setup({ metodos: metodosCredito });
+    await pickCliente(view);
+    view.changeText({ placeholder: 'Primera cuota del cronograma (opcional)' }, '100.000');
+    view.press('Nequi'); // agrega Nequi con el restante (0)
+    // [monto efectivo, recibido efectivo, monto Nequi]; se vuelve a consultar tras cada render.
+    const input = (i: number) => view.queryAll((n) => n.type === 'TextInput' && n.props.placeholder === '0')[i];
+    view.changeText(input(0), '60.000');
+    view.changeText(input(1), '60.000');
+    view.changeText(input(2), '30.000');
+    view.press('Confirmar crédito');
+    expect(view.text()).toContain('La suma ($90.000) debe ser $100.000');
+    expect(onConfirm).not.toHaveBeenCalled();
+    view.changeText(input(2), '40.000');
+    view.press('Confirmar crédito');
+    expect(onConfirm.mock.calls[0][0].pagosCuotaInicial).toEqual([
+      { metodoPagoId: 'cash', monto: 60000, montoRecibido: 60000 },
+      { metodoPagoId: 'nequi', monto: 40000 },
+    ]);
+  });
+
+  it('sin métodos seleccionados no confirma la cuota inicial', async () => {
+    const { view, onConfirm } = setup({ metodos: soloNequi });
+    await pickCliente(view);
+    view.changeText({ placeholder: 'Primera cuota del cronograma (opcional)' }, '50.000');
+    view.press('Nequi'); // quita la única línea
+    view.press('Confirmar crédito');
+    expect(view.text()).toContain('Selecciona al menos un método de pago');
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('rechaza una cuota inicial mal escrita en lugar de tomarla como 0', async () => {
@@ -250,7 +330,7 @@ describe('CreditoVentaModal', () => {
   it('al reabrirse no conserva el cliente ni la cuota de la venta anterior', async () => {
     const onConfirm = vi.fn();
     const el = (visible: boolean) => (
-      <CreditoVentaModal visible={visible} cart={cart} almacenId="a1" totalVenta={300000}
+      <CreditoVentaModal visible={visible} cart={cart} metodos={soloNequi} almacenId="a1" totalVenta={300000}
         onConfirm={onConfirm} onClose={vi.fn()} tint="b" onPrimary="w" />
     );
     let visible = true;

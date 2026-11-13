@@ -225,3 +225,104 @@ describe('pantallas de separados', () => {
     expect(postIdempotent.mock.calls[0][1]).toMatchObject({ clienteId: 'c1', almacenId: 'a1', anticipo: 10000 });
   });
 });
+
+describe('separados con módulo caja', () => {
+  const metodos = [
+    { id: 'cash', nombre: 'Efectivo', codigo: 'efectivo', estado: 'activo', esEfectivo: true },
+    { id: 'nequi', nombre: 'Nequi', codigo: 'nequi', estado: 'activo', esEfectivo: false },
+  ];
+  beforeEach(() => {
+    signInAs(makeUser([...ALL, 'clientes:ver', 'productos:ver'], ['ventas', 'clientes', 'inventario', 'caja']));
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation(async (path: string, init?: unknown) =>
+      path === '/metodos-pago' ? metodos : base(path, init),
+    );
+  });
+
+  it('abono: exige método; en efectivo calcula el cambio y envía recibido con Idempotency intent', async () => {
+    const view = render(withQuery(<SeparadoDetailScreen />));
+    await waitFor(() => view.getByText('Saldo: $80.000'));
+    view.changeText({ placeholder: 'Monto del abono' }, '30.000');
+    expect(view.isDisabled(view.queryAllByText('Registrar abono').at(-1)!)).toBe(true);
+    view.press('Método de pago: Seleccionar');
+    await waitFor(() => view.getByText('Efectivo'));
+    view.press('Efectivo');
+    view.changeText({ placeholder: 'Monto recibido (opcional)' }, '20.000');
+    view.getByText('El monto recibido debe cubrir el valor a cobrar.');
+    view.changeText({ placeholder: 'Monto recibido (opcional)' }, '50.000');
+    view.getByText('Cambio: $20.000');
+    view.press(view.queryAllByText('Registrar abono').at(-1)!);
+    lastAlertButtons()[1].onPress!();
+    await waitFor(() =>
+      expect(postIdempotent).toHaveBeenCalledWith(
+        'separados/s1/abonar',
+        { monto: 30000, metodoPagoId: 'cash', montoRecibido: 50000 },
+        expect.any(String),
+      ),
+    );
+  });
+
+  it('cancelar: reembolso opcional con tope en lo abonado', async () => {
+    const view = render(withQuery(<SeparadoDetailScreen />));
+    await waitFor(() => view.getByText('Reembolso opcional: hasta $20.000. Sale de tu caja abierta.'));
+    view.changeText({ placeholder: 'Motivo de la cancelación' }, 'Cliente desistió');
+    view.changeText({ placeholder: 'Monto a reembolsar (opcional)' }, '25.000');
+    view.getByText('El reembolso supera lo que se puede devolver.');
+    view.changeText({ placeholder: 'Monto a reembolsar (opcional)' }, '20.000');
+    view.getByText('Selecciona el método del reembolso.');
+    view.press('Método del reembolso: Seleccionar');
+    await waitFor(() => view.getByText('Nequi'));
+    view.press('Nequi');
+    view.press(view.queryAllByText('Cancelar separado').at(-1)!);
+    expect(vi.mocked(Alert.alert).mock.calls.at(-1)![1]).toMatch(/reembolsarán \$20\.000 desde tu caja/);
+    lastAlertButtons()[1].onPress!();
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith('separados/s1/cancelar', {
+        method: 'POST',
+        body: { observaciones: 'Cliente desistió', reembolso: { metodoPagoId: 'nequi', monto: 20000 } },
+      }),
+    );
+  });
+
+  it('alta: anticipo > 0 exige método; anticipo 0 no', async () => {
+    const { result } = renderHook(
+      () => useSeparadoForm([{ id: 'cash', nombre: 'Efectivo', esEfectivo: true }]),
+      withQuery,
+    );
+    result.current.setCliente({ id: 'c1', tipoDocumento: 'CC', numeroDocumento: '1', nombre: 'Ana', apellido: null, razonSocial: null, telefono: null });
+    result.current.setAlmacenId('a1');
+    result.current.addProducto({ id: 'p1', codigo: 'C', codigoBarras: null, nombre: 'Cable', precioVenta: 50000, unidadMedidaId: 'u', estado: 'activo' });
+    result.current.setFecha('2099-01-01');
+    expect(result.current.error).toBeNull();
+    result.current.setAnticipo('10.000');
+    expect(result.current.error).toBe('Selecciona el método de pago del anticipo.');
+    result.current.setMethod('cash');
+    result.current.setReceived('20.000');
+    expect(result.current.cobro.cambio).toBe(10000);
+    await result.current.submit();
+    expect(postIdempotent.mock.calls[0][1]).toMatchObject({ anticipo: 10000, metodoPagoId: 'cash', montoRecibido: 20000 });
+  });
+
+  it('CAJA_NO_ABIERTA al abonar muestra el aviso de caja', async () => {
+    postIdempotent.mockRejectedValueOnce(new ApiError(409, 'Debes abrir tu caja', { code: 'CAJA_NO_ABIERTA' }));
+    const view = render(withQuery(<SeparadoDetailScreen />));
+    await waitFor(() => view.getByText('Saldo: $80.000'));
+    view.changeText({ placeholder: 'Monto del abono' }, '30.000');
+    view.press('Método de pago: Seleccionar');
+    await waitFor(() => view.getByText('Nequi'));
+    view.press('Nequi');
+    view.press(view.queryAllByText('Registrar abono').at(-1)!);
+    lastAlertButtons()[1].onPress!();
+    await waitFor(() => expect(vi.mocked(Alert.alert).mock.calls.at(-1)![0]).toBe('Caja cerrada'));
+  });
+});
+
+describe('separados sin módulo caja', () => {
+  it('no pide método ni ofrece reembolso, ni consulta métodos', async () => {
+    const view = render(withQuery(<SeparadoDetailScreen />));
+    await waitFor(() => view.getByText('Saldo: $80.000'));
+    expect(view.queryByText(/Método de pago/)).toBeNull();
+    expect(view.queryByText(/Reembolso/)).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalledWith('/metodos-pago');
+  });
+});

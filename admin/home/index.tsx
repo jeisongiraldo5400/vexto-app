@@ -10,7 +10,7 @@ import { Colors } from "@/constants/theme";
 import { formatCurrency, formatNumber } from "@/core/format";
 import { ApiError } from "@/core/http/api";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect } from "expo-router/react-navigation";
 import { useCallback } from "react";
 import {
   ActivityIndicator,

@@ -4,6 +4,9 @@ import {
   readRepairPhoto,
   repairAction,
 } from "@/admin/repairs/adapters";
+import { useAuthStore } from "@/admin/auth/store/auth-store";
+import { evaluarCobro, type MetodoCobro } from "@/admin/cash-register/cobro";
+import { cajaHabilitada } from "@/core/caja/caja-guard";
 import { apiFetch } from "@/core/http/api";
 import { newIdempotencyIntent } from "@/core/http/idempotent";
 import { parseCantidad, parseMonto } from "@/core/utils/money";
@@ -86,26 +89,55 @@ export function useQaForm(id: string) {
 }
 export type QaForm = ReturnType<typeof useQaForm>;
 
-/** Registro de abonos con intención idempotente. */
-export function usePaymentForm(id: string) {
+/**
+ * Registro de abonos con intención idempotente. Con el módulo caja, un método en
+ * efectivo (`metodos`) admite el monto recibido para calcular el cambio.
+ */
+export function usePaymentForm(id: string, metodos: MetodoCobro[] = []) {
+  const conCaja = cajaHabilitada(useAuthStore((s) => s.user));
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("");
+  const [received, setReceived] = useState("");
   /** Intención del abono en curso: igual en reintentos, nueva tras el éxito. */
   const payIntent = useRef<string | null>(null);
+  const monto = parseMonto(amount);
+  const cobro = evaluarCobro(
+    conCaja ? metodos.find((m) => m.id === method) : undefined,
+    monto,
+    received,
+  );
   const pay = async () => {
     payIntent.current ??= newIdempotencyIntent();
     await payRepair(
       id,
-      { monto: parseMonto(amount), metodoPagoId: method },
+      {
+        monto,
+        metodoPagoId: method,
+        ...(cobro.montoRecibido != null
+          ? { montoRecibido: cobro.montoRecibido }
+          : {}),
+      },
       payIntent.current,
     );
     payIntent.current = null;
     setAmount("");
+    setReceived("");
   };
   const revert = (pagoId: string) =>
     repairAction(id, `pagos/${pagoId}/cancelar`);
-  const invalid = !method || !(parseMonto(amount) > 0);
-  return { amount, setAmount, method, setMethod, pay, revert, invalid };
+  const invalid = !method || !(monto > 0) || !!cobro.error;
+  return {
+    amount,
+    setAmount,
+    method,
+    setMethod,
+    received,
+    setReceived,
+    cobro,
+    pay,
+    revert,
+    invalid,
+  };
 }
 export type PaymentForm = ReturnType<typeof usePaymentForm>;
 

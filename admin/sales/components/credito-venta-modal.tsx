@@ -4,10 +4,19 @@ import {
   type ModoClienteVenta,
 } from '@/admin/sales/components/cliente-venta-section';
 import type { CartLine } from '@/admin/sales/components/cart-lines-list';
+import {
+  PagosMultiSelectSection,
+  createInitialPagosLineasMobile,
+  lineasToPayload,
+  validarPagosLineasMobile,
+  type PagoLineaMobile,
+} from '@/admin/sales/components/pagos-multi-select-section';
+import { metodosCuotaInicial } from '@/admin/sales/constants/metodos-pago';
+import type { CrearVentaCreditoPagoLinea } from '@/admin/sales/adapters/credito.adapter';
 import { MontoInput } from '@/components/ui/monto-input';
 import { formatCurrency } from '@/core/format';
 import { parseMonto } from '@/core/utils/money';
-import type { Cliente } from '@/core/types';
+import type { Cliente, MetodoPago } from '@/core/types';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEffect, useMemo, useState } from 'react';
@@ -22,25 +31,34 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+export type CreditoVentaParams = {
+  clienteId: string;
+  cuotaInicial: number;
+  numeroCuotas: number;
+  frecuenciaDias: number;
+  /** Cobro en contado de la cuota inicial; presente solo si `cuotaInicial > 0`. */
+  pagosCuotaInicial?: CrearVentaCreditoPagoLinea[];
+};
+
 type Props = {
   visible: boolean;
+  /** Métodos de pago de la empresa; la cuota inicial se cobra con ellos. */
+  metodos?: MetodoPago[];
   cart: CartLine[];
   almacenId: string | null;
   totalVenta: number;
-  onConfirm: (params: {
-    clienteId: string;
-    cuotaInicial: number;
-    numeroCuotas: number;
-    frecuenciaDias: number;
-  }) => void;
+  onConfirm: (params: CreditoVentaParams) => void;
   onClose: () => void;
   tint: string;
   onPrimary: string;
   loading?: boolean;
 };
 
+const SIN_METODOS: MetodoPago[] = [];
+
 export function CreditoVentaModal({
   visible,
+  metodos = SIN_METODOS,
   cart,
   almacenId,
   totalVenta,
@@ -74,6 +92,16 @@ export function CreditoVentaModal({
   }, [visible]);
 
   const cuotaInicialNum = parseMonto(cuotaInicial) || 0;
+  const metodosCuota = useMemo(() => metodosCuotaInicial(metodos), [metodos]);
+  /** Líneas de cobro de la cuota inicial (misma UX que el cobro de una venta). */
+  const [lineasCuota, setLineasCuota] = useState<PagoLineaMobile[]>([]);
+
+  // Cada cuota inicial nueva arranca con una línea del método por defecto por el total.
+  useEffect(() => {
+    setLineasCuota(
+      cuotaInicialNum > 0 ? createInitialPagosLineasMobile(metodosCuota, cuotaInicialNum) : [],
+    );
+  }, [cuotaInicialNum, metodosCuota]);
   const numCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
   const freq = Math.max(1, parseInt(frecuenciaDias, 10) || 30);
   const saldoFinanciado = Math.max(0, totalVenta - cuotaInicialNum);
@@ -104,12 +132,22 @@ export function CreditoVentaModal({
       setError('La cuota inicial no puede superar el total');
       return;
     }
+    // La cuota inicial se cobra en contado: el backend exige método(s) que sumen la cuota
+    // y monto recibido en las líneas de efectivo.
+    if (cuotaInicialNum > 0) {
+      const errPagos = validarPagosLineasMobile(lineasCuota, cuotaInicialNum, metodosCuota);
+      if (errPagos) {
+        setError(errPagos);
+        return;
+      }
+    }
     setError(null);
     onConfirm({
       clienteId: cliente.id,
       cuotaInicial: cuotaInicialNum,
       numeroCuotas: saldoFinanciado > 0 ? numCuotas : 1,
       frecuenciaDias: freq,
+      ...(cuotaInicialNum > 0 ? { pagosCuotaInicial: lineasToPayload(lineasCuota) } : {}),
     });
   }
 
@@ -129,7 +167,8 @@ export function CreditoVentaModal({
           </Text>
 
           <Text style={{ color: c.textSecondary, marginBottom: 8 }}>
-            Método de pago: crédito propio. La cuota inicial forma parte del cronograma.
+            Método de pago: crédito propio. La cuota inicial forma parte del cronograma y se cobra en
+            contado al registrar la venta.
           </Text>
 
           <ClienteVentaSection
@@ -150,6 +189,21 @@ export function CreditoVentaModal({
             placeholder="Primera cuota del cronograma (opcional)"
             style={[styles.input, { borderColor: c.border, color: c.text }]}
           />
+
+          {cuotaInicialNum > 0 ? (
+            <View style={{ marginTop: 12 }}>
+              <Text style={[styles.label, { color: c.text }]}>Cobro de la cuota inicial</Text>
+              <PagosMultiSelectSection
+                metodos={metodosCuota}
+                lineas={lineasCuota}
+                totalObjetivo={cuotaInicialNum}
+                onLineasChange={setLineasCuota}
+                tint={tint}
+                c={c}
+                totalLabel="Cuota inicial"
+              />
+            </View>
+          ) : null}
 
           <Text style={[styles.label, { color: c.text }]}>Número de cuotas</Text>
           <TextInput

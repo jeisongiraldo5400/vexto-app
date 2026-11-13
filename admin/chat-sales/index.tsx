@@ -5,6 +5,7 @@ import { ChatMessageBubble } from '@/admin/chat-sales/components/chat-message-bu
 import { useSendChatMessageMutation } from '@/admin/chat-sales/hooks/use-send-chat-message';
 import { useChatStore } from '@/admin/chat-sales/store/chat-store';
 import { Colors } from '@/constants/theme';
+import { handleCajaNoAbierta } from '@/core/caja/caja-guard';
 import { ApiError } from '@/core/http/api';
 import { invalidateAfterVenta } from '@/core/query/invalidate-after-venta';
 import type { ChatMessage } from '@/core/types';
@@ -152,6 +153,8 @@ export default function ChatVentaScreen () {
           });
         }
       } catch (e) {
+        // Venta por chat sin caja abierta: además del mensaje, ofrece abrirla.
+        handleCajaNoAbierta(e, queryClient);
         const msg = e instanceof ApiError ? e.message : 'No se pudo procesar el mensaje. Revisa tu conexión.';
         useChatStore.getState().updateMessage(botMsgId, {
           content: msg,
@@ -218,6 +221,8 @@ export default function ChatVentaScreen () {
           action,
         });
       } catch (e) {
+        // Venta por chat sin caja abierta: además del mensaje, ofrece abrirla.
+        handleCajaNoAbierta(e, queryClient);
         const msg = e instanceof ApiError ? e.message : 'No se pudo procesar la selección.';
         useChatStore.getState().updateMessage(botMsgId, {
           content: msg,
@@ -280,6 +285,8 @@ export default function ChatVentaScreen () {
           action,
         });
       } catch (e) {
+        // Venta por chat sin caja abierta: además del mensaje, ofrece abrirla.
+        handleCajaNoAbierta(e, queryClient);
         const msg = e instanceof ApiError ? e.message : 'No se pudo confirmar el precio.';
         useChatStore.getState().updateMessage(botMsgId, {
           content: msg,

@@ -21,6 +21,7 @@ import {
   Text,
   TextInput,
   View,
+  type ScrollViewInstance,
   type TextInputProps,
 } from "react-native";
 
@@ -33,7 +34,7 @@ export function Screen({
   scrollRef,
 }: {
   children: ReactNode;
-  scrollRef?: Ref<ScrollView>;
+  scrollRef?: Ref<ScrollViewInstance>;
 }) {
   const c = useThemeColors();
   return (

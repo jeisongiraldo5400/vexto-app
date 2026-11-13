@@ -32,8 +32,24 @@ const MANAGEMENT: Record<string, [string, string, string, string]> = {
   ],
 };
 
+/** Permisos del módulo `caja`; cualquiera de ellos deja ver la caja propia. */
+export const CAJA_PERMISOS = [
+  "caja:ver",
+  "caja:abrir",
+  "caja:cerrar",
+  "caja:movimientos",
+  "caja:aprobar",
+];
+
 export function canOpenPath(user: AuthUser | null, path: string) {
   const [first, second] = segments(path);
+  // Caja: opt-in por empresa. El cierre exige `caja:cerrar`; el resto, cualquier permiso.
+  if (first === "caja")
+    return canAccess(
+      user,
+      "caja",
+      ...(second === "cerrar" ? ["caja:cerrar"] : CAJA_PERMISOS),
+    );
   const managed = MANAGEMENT[first];
   if (managed) {
     const [module, list, create, detail] = managed;

@@ -111,4 +111,30 @@ describe("módulos de gestión (clientes, separados, créditos, pagos, devolucio
     expect(canOpenPath(user([], []), "/perfil")).toBe(true);
     expect(canOpenPath(null, "/perfil")).toBe(false);
   });
+  it("caja: exige el módulo y algún permiso; el cierre exige caja:cerrar", () => {
+    const cajero = user(["caja:abrir", "caja:movimientos"], ["caja"]);
+    for (const path of ["/caja", "/(app)/caja", "/caja/historial", "/caja/abc-123"])
+      expect(canOpenPath(cajero, path), path).toBe(true);
+    expect(canOpenPath(cajero, "/caja/cerrar")).toBe(false);
+    expect(canOpenPath(cajero, "/caja/cerrar?id=abc")).toBe(false);
+    expect(
+      canOpenPath(user(["caja:cerrar"], ["caja"]), "/(app)/caja/cerrar?id=abc"),
+    ).toBe(true);
+    // Supervisor que solo revisa: ve el historial sin poder abrir ni cerrar.
+    const supervisor = user(["caja:ver", "caja:aprobar"], ["caja"]);
+    expect(canOpenPath(supervisor, "/caja/abc-123")).toBe(true);
+    expect(canOpenPath(supervisor, "/caja/cerrar")).toBe(false);
+  });
+  it("caja: sin módulo o sin permisos de caja no se abre", () => {
+    expect(canOpenPath(user(["caja:abrir", "caja:cerrar"], ["pos"]), "/caja")).toBe(false);
+    expect(canOpenPath(user(["caja:cerrar"], []), "/caja/cerrar")).toBe(false);
+    expect(canOpenPath(user(["pos:crear", "ventas:crear"], ["pos", "caja"]), "/caja")).toBe(false);
+    expect(canOpenPath(null, "/caja")).toBe(false);
+  });
+  it("el módulo caja no altera el acceso al resto de rutas", () => {
+    const vendedor = user(["pos:crear"], ["pos", "caja"]);
+    expect(canOpenPath(vendedor, "/venta")).toBe(true);
+    expect(canOpenPath(vendedor, "/perfil")).toBe(true);
+    expect(canOpenPath(vendedor, "/gastos")).toBe(false);
+  });
 });
