@@ -55,6 +55,8 @@ export type MetodoPago = {
   nombre: string;
   codigo: string;
   estado: string;
+  /** El método mueve efectivo (entra al arqueo de caja). Ausente en backends anteriores. */
+  esEfectivo?: boolean;
 };
 
 /** Respuesta de listado / creación de clientes (subset útil para POS). */

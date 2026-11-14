@@ -46,7 +46,9 @@ function inferDevApiBaseUrl(): string {
   const packagerHost = hostUri ? parseHostFromExpoHostUri(hostUri) : null;
 
   if (packagerHost && !isExpoTunnelHost(packagerHost)) {
-    return `http://${packagerHost}:${port}${path}`;
+    // IPv6 literal: la URL necesita corchetes (`http://[::1]:3001`).
+    const host = packagerHost.includes(':') ? `[${packagerHost}]` : packagerHost;
+    return `http://${host}:${port}${path}`;
   }
 
   if (isDevice) {

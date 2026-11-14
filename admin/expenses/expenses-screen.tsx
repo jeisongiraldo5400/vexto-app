@@ -1,8 +1,16 @@
+import { useSessionQueryEnabled } from "@/admin/auth/hooks/use-session-query-enabled";
 import { useAuthStore } from "@/admin/auth/store/auth-store";
 import { ChoiceField } from "@/admin/repairs/choice-field";
 import { apiFetch } from "@/core/http/api";
-import { postIdempotent } from "@/core/http/idempotent";
+import { MontoInput } from "@/components/ui/monto-input";
+import {
+  newIdempotencyIntent,
+  postIdempotent,
+} from "@/core/http/idempotent";
+import { formatCurrency } from "@/core/format";
 import { canAccess } from "@/core/permissions";
+import { toLocalYmd } from "@/core/utils/date";
+import { formatMontoInput, parseMonto } from "@/core/utils/money";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +23,7 @@ import {
   Text,
   TextInput,
   View,
+  type ScrollViewInstance,
 } from "react-native";
 
 type Expense = {
@@ -31,6 +40,7 @@ export function ExpensesScreen() {
   const user = useAuthStore((s) => s.user);
   const empresa = useAuthStore((s) => s.empresaId);
   const can = (p: string) => canAccess(user, "finanzas", p);
+  const sessionEnabled = useSessionQueryEnabled();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const q = useQuery({
@@ -39,7 +49,7 @@ export function ExpensesScreen() {
       apiFetch<{ gastos: Expense[]; total: number }>(
         `gastos?page=${page}&limit=20&busqueda=${encodeURIComponent(search)}`,
       ),
-    enabled: can("gastos:ver"),
+    enabled: sessionEnabled && can("gastos:ver"),
   });
   const categories = useQuery({
     queryKey: ["categorias-gasto", empresa],
@@ -47,12 +57,12 @@ export function ExpensesScreen() {
       apiFetch<{ categorias: { id: string; nombre: string }[] }>(
         "categorias-gasto?page=1&limit=100",
       ),
-    enabled: can("gastos:crear") || can("gastos:editar"),
+    enabled: sessionEnabled && (can("gastos:crear") || can("gastos:editar")),
   });
   const methods = useQuery({
     queryKey: ["expense-methods", empresa],
     queryFn: () => apiFetch<{ id: string; nombre: string }[]>("metodos-pago"),
-    enabled: can("gastos:crear") || can("gastos:editar"),
+    enabled: sessionEnabled && (can("gastos:crear") || can("gastos:editar")),
   });
   const [editing, setEditing] = useState<Expense | null | undefined>(undefined);
   const [concept, setConcept] = useState("");
@@ -62,15 +72,20 @@ export function ExpensesScreen() {
   const [method, setMethod] = useState("");
   const [notes, setNotes] = useState("");
   const pending = useRef(false);
+  const createIntent = useRef("");
+  const scroll = useRef<ScrollViewInstance>(null);
   const [busy, setBusy] = useState(false);
   const open = (e: Expense | null) => {
+    if (!e) createIntent.current = newIdempotencyIntent();
     setEditing(e);
     setConcept(e?.concepto ?? "");
-    setAmount(e ? String(e.monto) : "");
-    setDate(e?.fecha?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    setAmount(e ? formatMontoInput(Number(e.monto)) : "");
+    setDate(e?.fecha?.slice(0, 10) ?? toLocalYmd());
     setCategory(e?.categoriaId ?? "");
     setMethod(e?.metodoPagoId ?? "");
     setNotes(e?.observaciones ?? "");
+    // El formulario se muestra arriba de la lista: llevarlo a la vista.
+    scroll.current?.scrollTo({ y: 0, animated: true });
   };
   const run = async (fn: () => Promise<unknown>) => {
     if (pending.current) return;
@@ -78,8 +93,10 @@ export function ExpensesScreen() {
     setBusy(true);
     try {
       await fn();
-      await q.refetch();
+      const { data } = await q.refetch();
       setEditing(undefined);
+      // Si se borró el último ítem de la página, volver a la anterior.
+      if (page > 1 && data && data.gastos.length === 0) setPage(page - 1);
     } catch (e) {
       Alert.alert(
         "No se pudo guardar",
@@ -108,7 +125,6 @@ export function ExpensesScreen() {
     label: string,
     value: string,
     set: (v: string) => void,
-    numeric = false,
   ) => (
     <TextInput
       placeholder={label}
@@ -116,7 +132,6 @@ export function ExpensesScreen() {
       placeholderTextColor={c.textSecondary}
       value={value}
       onChangeText={set}
-      keyboardType={numeric ? "decimal-pad" : "default"}
       style={{
         color: c.text,
         borderWidth: 1,
@@ -127,6 +142,7 @@ export function ExpensesScreen() {
   );
   return (
     <ScrollView
+      ref={scroll}
       contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 70 }}
     >
       <Text style={{ color: c.text, fontSize: 24, fontWeight: "700" }}>
@@ -137,6 +153,68 @@ export function ExpensesScreen() {
         setPage(1);
       })}
       {can("gastos:crear") && button("Nuevo gasto", () => open(null))}
+      {editing !== undefined &&
+        can(editing ? "gastos:editar" : "gastos:crear") && (
+          <>
+            <Text style={{ color: c.text, fontSize: 20 }}>
+              {editing ? "Editar" : "Nuevo"} gasto
+            </Text>
+            {field("Concepto", concept, setConcept)}
+            <MontoInput
+              placeholder="Monto"
+              accessibilityLabel="Monto"
+              placeholderTextColor={c.textSecondary}
+              value={amount}
+              onChangeText={setAmount}
+              style={{
+                color: c.text,
+                borderWidth: 1,
+                borderColor: c.cardBorder,
+                padding: 12,
+              }}
+            />
+            {field("Fecha AAAA-MM-DD", date, setDate)}
+            <ChoiceField
+              label="Categoría"
+              value={category}
+              onChange={setCategory}
+              options={categories.data?.categorias ?? []}
+            />
+            <ChoiceField
+              label="Método de pago"
+              value={method}
+              onChange={setMethod}
+              options={methods.data ?? []}
+            />
+            {field("Observaciones", notes, setNotes)}
+            {button("Guardar", () => {
+              const monto = parseMonto(amount);
+              if (
+                !concept.trim() ||
+                !Number.isFinite(monto) ||
+                monto <= 0 ||
+                !/^\d{4}-\d{2}-\d{2}$/.test(date)
+              ) {
+                Alert.alert("Revisa concepto, monto y fecha");
+                return;
+              }
+              const body = {
+                concepto: concept.trim(),
+                monto,
+                fecha: date,
+                categoriaId: category || undefined,
+                metodoPagoId: method || undefined,
+                observaciones: notes || undefined,
+              };
+              void run(() =>
+                editing
+                  ? apiFetch(`gastos/${editing.id}`, { method: "PUT", body })
+                  : postIdempotent("gastos", body, createIntent.current),
+              );
+            })}
+            {button("Cancelar", () => setEditing(undefined))}
+          </>
+        )}
       {q.isLoading && <ActivityIndicator />}
       {q.isError &&
         button("Reintentar: " + q.error.message, () => void q.refetch())}
@@ -152,7 +230,7 @@ export function ExpensesScreen() {
           }}
         >
           <Text style={{ color: c.text }}>
-            {e.concepto} · ${e.monto} · {e.fecha?.slice(0, 10)}
+            {e.concepto} · {formatCurrency(Number(e.monto))} · {e.fecha?.slice(0, 10)}
           </Text>
           {can("gastos:editar") && button("Editar", () => open(e))}
           {can("gastos:eliminar") &&
@@ -177,55 +255,6 @@ export function ExpensesScreen() {
         {page * 20 < (q.data?.total ?? 0) &&
           button("Siguiente", () => setPage(page + 1))}
       </View>
-      {editing !== undefined &&
-        can(editing ? "gastos:editar" : "gastos:crear") && (
-          <>
-            <Text style={{ color: c.text, fontSize: 20 }}>
-              {editing ? "Editar" : "Nuevo"} gasto
-            </Text>
-            {field("Concepto", concept, setConcept)}
-            {field("Monto", amount, setAmount, true)}
-            {field("Fecha AAAA-MM-DD", date, setDate)}
-            <ChoiceField
-              label="Categoría"
-              value={category}
-              onChange={setCategory}
-              options={categories.data?.categorias ?? []}
-            />
-            <ChoiceField
-              label="Método de pago"
-              value={method}
-              onChange={setMethod}
-              options={methods.data ?? []}
-            />
-            {field("Observaciones", notes, setNotes)}
-            {button("Guardar", () => {
-              if (
-                !concept.trim() ||
-                !Number.isFinite(Number(amount)) ||
-                Number(amount) <= 0 ||
-                !/^\d{4}-\d{2}-\d{2}$/.test(date)
-              ) {
-                Alert.alert("Revisa concepto, monto y fecha");
-                return;
-              }
-              const body = {
-                concepto: concept.trim(),
-                monto: Number(amount),
-                fecha: date,
-                categoriaId: category || undefined,
-                metodoPagoId: method || undefined,
-                observaciones: notes || undefined,
-              };
-              void run(() =>
-                editing
-                  ? apiFetch(`gastos/${editing.id}`, { method: "PUT", body })
-                  : postIdempotent("gastos", body),
-              );
-            })}
-            {button("Cancelar", () => setEditing(undefined))}
-          </>
-        )}
     </ScrollView>
   );
 }

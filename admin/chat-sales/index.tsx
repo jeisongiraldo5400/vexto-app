@@ -1,23 +1,24 @@
+import { ChatEmptyState } from '@/admin/chat-sales/components/chat-empty-state';
+import { ChatHeader } from '@/admin/chat-sales/components/chat-header';
 import { ChatInputBar } from '@/admin/chat-sales/components/chat-input-bar';
 import { ChatMessageBubble } from '@/admin/chat-sales/components/chat-message-bubble';
 import { useSendChatMessageMutation } from '@/admin/chat-sales/hooks/use-send-chat-message';
 import { useChatStore } from '@/admin/chat-sales/store/chat-store';
 import { Colors } from '@/constants/theme';
+import { handleCajaNoAbierta } from '@/core/caja/caja-guard';
 import { ApiError } from '@/core/http/api';
 import { invalidateAfterVenta } from '@/core/query/invalidate-after-venta';
 import type { ChatMessage } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Keyboard,
-  Platform,
-  Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,7 +44,6 @@ export default function ChatVentaScreen () {
 
   const sendMutation = useSendChatMessageMutation();
   const listRef = useRef<FlatList>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const scrollToEnd = useCallback(() => {
     setTimeout(() => {
@@ -52,25 +52,7 @@ export default function ChatVentaScreen () {
   }, []);
 
   // Escuchar altura del teclado para elevar la barra de entrada.
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSubscription = Keyboard.addListener(showEvent, (e) => {
-      Keyboard.scheduleLayoutAnimation(e);
-      setKeyboardHeight(e.endCoordinates.height);
-      setTimeout(() => scrollToEnd(), 150);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, (e) => {
-      Keyboard.scheduleLayoutAnimation(e);
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [scrollToEnd]);
+  const keyboardHeight = useKeyboardHeight(scrollToEnd);
 
   const keyboardOpen = keyboardHeight > 0;
   const bottomSpacerHeight = keyboardOpen ? Math.max(keyboardHeight - insets.bottom + 4, 0) : insets.bottom;
@@ -171,6 +153,8 @@ export default function ChatVentaScreen () {
           });
         }
       } catch (e) {
+        // Venta por chat sin caja abierta: además del mensaje, ofrece abrirla.
+        handleCajaNoAbierta(e, queryClient);
         const msg = e instanceof ApiError ? e.message : 'No se pudo procesar el mensaje. Revisa tu conexión.';
         useChatStore.getState().updateMessage(botMsgId, {
           content: msg,
@@ -237,6 +221,8 @@ export default function ChatVentaScreen () {
           action,
         });
       } catch (e) {
+        // Venta por chat sin caja abierta: además del mensaje, ofrece abrirla.
+        handleCajaNoAbierta(e, queryClient);
         const msg = e instanceof ApiError ? e.message : 'No se pudo procesar la selección.';
         useChatStore.getState().updateMessage(botMsgId, {
           content: msg,
@@ -299,6 +285,8 @@ export default function ChatVentaScreen () {
           action,
         });
       } catch (e) {
+        // Venta por chat sin caja abierta: además del mensaje, ofrece abrirla.
+        handleCajaNoAbierta(e, queryClient);
         const msg = e instanceof ApiError ? e.message : 'No se pudo confirmar el precio.';
         useChatStore.getState().updateMessage(botMsgId, {
           content: msg,
@@ -315,62 +303,11 @@ export default function ChatVentaScreen () {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <View style={[styles.header, { backgroundColor: c.backgroundPaper, borderBottomColor: c.border }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: c.text }]}>Venta por Chat</Text>
-          <Text style={[styles.headerSubtitle, { color: c.textSecondary }]}>
-            Escribe lo que vendiste en lenguaje natural
-          </Text>
-        </View>
-        {messages.length > 0 && (
-          <Pressable
-            onPress={clearChat}
-            style={({ pressed }) => [
-              styles.clearBtn,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}>
-            <Text style={{ color: c.error, fontSize: 13, fontWeight: '600' }}>
-              Limpiar
-            </Text>
-          </Pressable>
-        )}
-      </View>
+      <ChatHeader c={c} showClear={messages.length > 0} onClear={clearChat} />
 
       <View style={styles.chatBody}>
         {messages.length === 0 ? (
-          <Pressable style={styles.listContainer} onPress={Keyboard.dismiss} accessible={false}>
-            <View style={[styles.emptyState, keyboardOpen && styles.emptyStateKeyboardOpen]}>
-              <Text style={[styles.emptyTitle, { color: c.text }]}>
-                ¡Hola! 👋
-              </Text>
-              <Text style={[styles.emptyDesc, { color: c.textSecondary }]}>
-                Escribe algo como:
-              </Text>
-              <View style={styles.examples}>
-                {[
-                  'vendí 8 cervezas a 3500',
-                  'se fueron 3 arroz',
-                  'registrar venta de 2 hamburguesas a 15000'
-                ].map((ex) => (
-                  <Pressable
-                    key={ex}
-                    style={({ pressed }) => [
-                      styles.exampleChip,
-                      {
-                        backgroundColor: c.card,
-                        borderColor: c.border,
-                        opacity: pressed ? 0.8 : 1,
-                      },
-                    ]}
-                    onPress={() => handleSend(ex)}>
-                    <Text style={[styles.exampleText, { color: c.text }]}>
-                      {`"${ex}"`}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          </Pressable>
+          <ChatEmptyState c={c} keyboardOpen={keyboardOpen} onExample={handleSend} />
         ) : (
           <FlatList
             ref={listRef}
@@ -423,62 +360,6 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  clearBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingBottom: 24,
-    gap: 12,
-  },
-  emptyStateKeyboardOpen: {
-    justifyContent: 'flex-start',
-    paddingTop: 24,
-    paddingBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  emptyDesc: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  examples: {
-    marginTop: 8,
-    gap: 8,
-    width: '100%',
-  },
-  exampleChip: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  exampleText: {
-    fontSize: 14,
   },
   loadingOverlay: {
     position: 'absolute',

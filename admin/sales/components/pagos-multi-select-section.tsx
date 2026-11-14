@@ -1,7 +1,13 @@
+import { esMetodoEfectivo } from '@/admin/sales/constants/metodos-pago';
+import { MontoInput } from '@/components/ui/monto-input';
 import { formatCurrency } from '@/core/format';
 import type { MetodoPago } from '@/core/types';
+import { formatMontoInput, parseMonto } from '@/core/utils/money';
 import { useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+/** Monto escrito (es-CO) → número; vacío o inválido cuenta como 0. */
+const montoOCero = (text: string) => parseMonto(text) || 0;
 
 export type PagoLineaMobile = {
   id: string;
@@ -41,7 +47,7 @@ export function createPagoLinea(metodoPagoId: string, monto = ''): PagoLineaMobi
 }
 
 export function findDefaultMetodoId(metodos: MetodoPago[]): string {
-  const efectivo = metodos.find((m) => m.nombre.toLowerCase().includes('efectivo'));
+  const efectivo = metodos.find((m) => esMetodoEfectivo(m));
   return efectivo?.id ?? metodos[0]?.id ?? '';
 }
 
@@ -51,7 +57,7 @@ export function createInitialPagosLineasMobile(
 ): PagoLineaMobile[] {
   const defaultId = findDefaultMetodoId(metodos);
   if (!defaultId) return [];
-  return [createPagoLinea(defaultId, String(total))];
+  return [createPagoLinea(defaultId, formatMontoInput(total))];
 }
 
 export function validarPagosLineasMobile(
@@ -61,17 +67,17 @@ export function validarPagosLineasMobile(
 ): string | null {
   if (lineas.length === 0) return 'Selecciona al menos un método de pago';
 
-  const suma = lineas.reduce((acc, l) => acc + (parseFloat(l.monto) || 0), 0);
+  const suma = lineas.reduce((acc, l) => acc + montoOCero(l.monto), 0);
   if (Math.abs(suma - totalObjetivo) > 0.01) {
     return `La suma (${formatCurrency(suma)}) debe ser ${formatCurrency(totalObjetivo)}`;
   }
 
   for (const l of lineas) {
     const m = metodos.find((mp) => mp.id === l.metodoPagoId);
-    const monto = parseFloat(l.monto) || 0;
+    const monto = montoOCero(l.monto);
     if (monto <= 0) return 'Cada línea debe tener un monto mayor a 0';
-    if (m?.codigo === 'efectivo') {
-      const rec = parseFloat(l.montoRecibido);
+    if (esMetodoEfectivo(m)) {
+      const rec = parseMonto(l.montoRecibido);
       if (Number.isNaN(rec) || rec < monto) {
         return 'Indica el monto recibido en efectivo (≥ monto aplicado)';
       }
@@ -85,8 +91,8 @@ export function lineasToPayload(
   lineas: PagoLineaMobile[],
 ): { metodoPagoId: string; monto: number; montoRecibido?: number }[] {
   return lineas.map((l) => {
-    const monto = parseFloat(l.monto) || 0;
-    const rec = parseFloat(l.montoRecibido);
+    const monto = montoOCero(l.monto);
+    const rec = parseMonto(l.montoRecibido);
     return {
       metodoPagoId: l.metodoPagoId,
       monto,
@@ -106,7 +112,7 @@ export function PagosMultiSelectSection({
 }: Props) {
   const lineasCacheRef = useRef<Map<string, PagoLineaMobile>>(new Map());
 
-  const suma = lineas.reduce((acc, l) => acc + (parseFloat(l.monto) || 0), 0);
+  const suma = lineas.reduce((acc, l) => acc + montoOCero(l.monto), 0);
   const restante = Math.max(0, totalObjetivo - suma);
   const selectedIds = new Set(lineas.map((l) => l.metodoPagoId));
 
@@ -134,7 +140,11 @@ export function PagosMultiSelectSection({
       ...lineas,
       createPagoLinea(
         metodo.id,
-        esPrimero ? String(totalObjetivo) : restante > 0 ? String(restante) : '',
+        esPrimero
+          ? formatMontoInput(totalObjetivo)
+          : restante > 0
+            ? formatMontoInput(restante)
+            : '',
       ),
     ]);
   }
@@ -179,9 +189,9 @@ export function PagosMultiSelectSection({
 
       {lineas.map((linea) => {
         const metodo = metodos.find((m) => m.id === linea.metodoPagoId);
-        const esCash = metodo?.codigo === 'efectivo';
-        const monto = parseFloat(linea.monto) || 0;
-        const recibido = parseFloat(linea.montoRecibido) || 0;
+        const esCash = esMetodoEfectivo(metodo);
+        const monto = montoOCero(linea.monto);
+        const recibido = montoOCero(linea.montoRecibido);
         const vuelto = esCash && recibido >= monto ? recibido - monto : null;
 
         return (
@@ -193,10 +203,9 @@ export function PagosMultiSelectSection({
             </Text>
 
             <Text style={[styles.label, { color: c.textSecondary }]}>Monto</Text>
-            <TextInput
+            <MontoInput
               value={linea.monto}
               onChangeText={(v) => updateLinea(linea.id, { monto: v })}
-              keyboardType="decimal-pad"
               style={[styles.input, { borderColor: c.border, color: c.text }]}
               placeholder="0"
               placeholderTextColor={c.textSecondary}
@@ -205,10 +214,9 @@ export function PagosMultiSelectSection({
             {esCash ? (
               <>
                 <Text style={[styles.label, { color: c.textSecondary }]}>Recibido</Text>
-                <TextInput
+                <MontoInput
                   value={linea.montoRecibido}
                   onChangeText={(v) => updateLinea(linea.id, { montoRecibido: v })}
-                  keyboardType="decimal-pad"
                   style={[styles.input, { borderColor: c.border, color: c.text }]}
                   placeholder="0"
                   placeholderTextColor={c.textSecondary}

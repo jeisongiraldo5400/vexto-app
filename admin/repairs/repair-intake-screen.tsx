@@ -1,13 +1,13 @@
 import { NuevoClienteModal } from "@/admin/sales/components/nuevo-cliente-modal";
 import { useAuthStore } from "@/admin/auth/store/auth-store";
 import { ChoiceField } from "./choice-field";
-import { fetchRepairResources } from "./adapters";
+import { useRepairResourcesQuery } from "./hooks";
 import { apiFetch } from "@/core/http/api";
 import { postIdempotent } from "@/core/http/idempotent";
 import { canAccess } from "@/core/permissions";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -22,14 +22,11 @@ import {
 export function RepairIntakeScreen() {
   const c = Colors[useColorScheme() ?? "light"];
   const user = useAuthStore((s) => s.user);
-  const empresa = useAuthStore((s) => s.empresaId);
   const router = useRouter();
   const qc = useQueryClient();
-  const q = useQuery({
-    queryKey: ["repair-resources", empresa],
-    queryFn: fetchRepairResources,
-    enabled: canAccess(user, "reparaciones", "reparaciones:crear"),
-  });
+  const q = useRepairResourcesQuery(
+    canAccess(user, "reparaciones", "reparaciones:crear"),
+  );
   const [client, setClient] = useState("");
   const [device, setDevice] = useState("");
   const [type, setType] = useState("");

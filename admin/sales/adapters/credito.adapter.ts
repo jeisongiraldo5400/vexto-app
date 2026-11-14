@@ -1,5 +1,6 @@
 import { postIdempotent } from "@/core/http/idempotent";
 import { apiFetch } from "@/core/http/api";
+import { toLocalYmd } from "@/core/utils/date";
 
 export type CrearVentaCreditoPagoLinea = {
   metodoPagoId: string;
@@ -27,8 +28,15 @@ export type CrearVentaCreditoResponse = {
   credito: { id: string; saldoPendiente: number };
 };
 
-export function crearVentaCredito(body: CrearVentaCreditoPayload) {
-  return postIdempotent<CrearVentaCreditoResponse>("/creditos/ventas", body);
+export function crearVentaCredito(
+  body: CrearVentaCreditoPayload,
+  intent?: string,
+) {
+  return postIdempotent<CrearVentaCreditoResponse>(
+    "/creditos/ventas",
+    body,
+    intent,
+  );
 }
 
 export function fetchDeudaCliente(clienteId: string) {
@@ -51,7 +59,7 @@ export function previewCuotas(
     out.push({
       numero: 0,
       monto: cuotaInicial,
-      fecha: hoy.toISOString().slice(0, 10),
+      fecha: toLocalYmd(hoy),
     });
   }
 
@@ -64,7 +72,7 @@ export function previewCuotas(
       const monto =
         i === numeroCuotas ? Math.round((saldo - acc) * 100) / 100 : base;
       acc += monto;
-      out.push({ numero: i, monto, fecha: d.toISOString().slice(0, 10) });
+      out.push({ numero: i, monto, fecha: toLocalYmd(d) });
     }
   }
 

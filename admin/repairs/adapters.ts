@@ -55,7 +55,7 @@ export type RepairResources = {
   tecnicos: { id: string; nombre: string }[];
   productos: { id: string; nombre: string }[];
   almacenes: { id: string; nombre: string }[];
-  metodos: { id: string; nombre: string }[];
+  metodos: { id: string; nombre: string; esEfectivo?: boolean }[];
 };
 export function fetchRepairs(busqueda = "", pagina = 1, mine = false) {
   const q = new URLSearchParams({
@@ -112,6 +112,14 @@ export function repairAction(
   return action === "pagos"
     ? postIdempotent(path, body)
     : apiFetch(path, { method, body });
+}
+/** Abono idempotente: `intent` se conserva en reintentos y se renueva tras el éxito. */
+export function payRepair(
+  id: string,
+  body: { monto: number; metodoPagoId: string; montoRecibido?: number },
+  intent: string,
+) {
+  return postIdempotent(`reparaciones/${id}/pagos`, body, intent);
 }
 export function estimateAction(id: string, action: string) {
   return apiFetch(`reparaciones/cotizaciones/${id}/${action}`, {

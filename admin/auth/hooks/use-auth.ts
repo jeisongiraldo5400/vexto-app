@@ -28,7 +28,8 @@ export function useAuth() {
       const auth = await loginRequest(email.trim(), password);
       const empresas = await fetchEmpresas(auth.accessToken);
       let resolvedEmpresaId = auth.user.empresaId ?? '';
-      if (!resolvedEmpresaId && empresas.length === 1) {
+      // Con varias empresas la primera es provisional: el usuario elige en select-empresa.
+      if (!resolvedEmpresaId && empresas.length >= 1) {
         resolvedEmpresaId = empresas[0].id;
       }
       if (!resolvedEmpresaId) {
@@ -80,11 +81,12 @@ export function useAuth() {
     [router, setSession, queryClient],
   );
 
-  const signOut = useCallback(async () => {
+  /** `revoke: false` omite el logout del servidor (p. ej. si ya revocó las sesiones). */
+  const signOut = useCallback(async (options?: { revoke?: boolean }) => {
     const session = await secureSession.loadSession();
     let failed = false;
     try {
-      if (session) await logoutRequest(session.accessToken);
+      if (session && options?.revoke !== false) await logoutRequest(session.accessToken);
     } catch { failed = true; }
     await queryClient.cancelQueries();
     await secureSession.clearSession();
